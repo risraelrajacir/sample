@@ -2,11 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Flappy Bird</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #333; }
-        canvas { border: 2px solid #000; background-color: #70c5ce; cursor: pointer; }
+        /* CSS to ensure full screen, no scroll, and centered content */
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevents scroll bars */
+            height: 100%;
+            background-color: #333;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            border: 2px solid #000;
+            background-color: #70c5ce;
+            cursor: pointer;
+            /* Disables unwanted mobile behaviors */
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -15,6 +36,24 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+
+        // --- Responsive Canvas Scaling ---
+        function resizeGame() {
+            const gameRatio = canvas.width / canvas.height;
+            const windowRatio = window.innerWidth / window.innerHeight;
+            
+            if (windowRatio < gameRatio) {
+                // Window is taller than game
+                canvas.style.width = window.innerWidth + 'px';
+                canvas.style.height = (window.innerWidth / gameRatio) + 'px';
+            } else {
+                // Window is wider than game
+                canvas.style.height = window.innerHeight + 'px';
+                canvas.style.width = (window.innerHeight * gameRatio) + 'px';
+            }
+        }
+        window.addEventListener('resize', resizeGame);
+        resizeGame(); // Initial resize
 
         // --- Asset URLs ---
         const assets = {
@@ -214,11 +253,8 @@
                 },
                 drawPulsingButton: function(image, rect, frameCount) {
                     const pulse = Math.sin(frameCount * DEGREE * 5) * 0.05 + 1;
-                    ctx.save();
-                    ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
-                    ctx.scale(pulse, pulse);
-                    ctx.drawImage(image, -rect.w / 2, -rect.h / 2, rect.w, rect.h);
-                    ctx.restore();
+                    ctx.save(); ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
+                    ctx.scale(pulse, pulse); ctx.drawImage(image, -rect.w / 2, -rect.h / 2, rect.w, rect.h); ctx.restore();
                 },
                 drawTapAnimation: function() {
                     ctx.save(); ctx.globalAlpha = this.tapSymbolAlpha;
@@ -241,36 +277,27 @@
                 step: 0, timer: 0, panelY: canvas.height, panelTargetY: 180, panelSpeed: 15,
                 start: function() { this.step = 1; this.timer = 0; },
                 update: function() {
-                    if (this.step === 0) return;
-                    this.timer++;
-                    if (this.step === 1 && this.timer > 30) { this.step = 2; } // Wait before showing panel
+                    if (this.step === 0) return; this.timer++;
+                    if (this.step === 1 && this.timer > 30) { this.step = 2; }
                     if (this.step === 2) {
                         this.panelY = Math.max(this.panelTargetY, this.panelY - this.panelSpeed);
-                        if (this.panelY === this.panelTargetY) this.step = 3; // Panel in place
+                        if (this.panelY === this.panelTargetY) this.step = 3;
                     }
-                    if (this.step === 3 && this.timer > 90) { this.step = 4; } // Wait before showing button
+                    if (this.step === 3 && this.timer > 90) { this.step = 4; }
                 },
                 draw: function() {
-                    if (this.step >= 2) { // Show title
-                        ctx.drawImage(images.gameOver, (canvas.width - ui.titleSize.w) / 2, 120, ui.titleSize.w, ui.titleSize.h);
-                    }
-                    if (this.step >= 2) { // Draw panel sliding up
-                        ctx.drawImage(images.uiBackground, (canvas.width - ui.panelSize.w) / 2, this.panelY, ui.panelSize.w, ui.panelSize.h);
-                    }
-                    if (this.step === 4) { // Show button
-                        ui.drawPulsingButton(images.replayButton, ui.replayRect, frames);
-                    }
+                    if (this.step >= 2) { ctx.drawImage(images.gameOver, (canvas.width - ui.titleSize.w) / 2, 120, ui.titleSize.w, ui.titleSize.h); }
+                    if (this.step >= 2) { ctx.drawImage(images.uiBackground, (canvas.width - ui.panelSize.w) / 2, this.panelY, ui.panelSize.w, ui.panelSize.h); }
+                    if (this.step === 4) { ui.drawPulsingButton(images.replayButton, ui.replayRect, frames); }
                 },
-                reset: function() {
-                    this.step = 0; this.timer = 0; this.panelY = canvas.height;
-                }
+                reset: function() { this.step = 0; this.timer = 0; this.panelY = canvas.height; }
             };
 
             const score = {
                 best: parseInt(localStorage.getItem('flappybird_best')) || 0, value: 0,
                 draw: function() {
                     if (state.current === state.game) { drawTextWithShadow(this.value, canvas.width / 2, 50, "35px 'Arial Black', sans-serif", "center"); }
-                    else if (state.current === state.over && gameOverSequence.step >= 2) { // Only show score after panel appears
+                    else if (state.current === state.over && gameOverSequence.step >= 2) {
                         drawTextWithShadow("Score", 80, gameOverSequence.panelY + 42, "20px 'Arial Black', sans-serif", "left");
                         drawTextWithShadow("Best", 80, gameOverSequence.panelY + 82, "20px 'Arial Black', sans-serif", "left");
                         drawTextWithShadow(this.value, 210, gameOverSequence.panelY + 42, "20px 'Arial Black', sans-serif", "right");
@@ -286,10 +313,18 @@
                 ctx.fillStyle = "#FFF"; ctx.fillText(text, x, y);
             }
 
-            function getMousePos(canvas, evt) { let rect = canvas.getBoundingClientRect(); return { x: evt.clientX - rect.left, y: evt.clientY - rect.top }; }
+            function getMousePos(canvas, evt) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                // For touch events, get the first touch
+                const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+                const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+                return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+            }
             function isInside(pos, rect) { return pos.x > rect.x && pos.x < rect.x + rect.w && pos.y < rect.y + rect.h && pos.y > rect.y; }
 
-            function handleInput() {
+            function handleInput(evt) {
                 if (state.current === state.instructions || state.current === state.game) {
                     if (state.current === state.instructions) {
                         ui.isFadingTapSymbol = true;
@@ -299,9 +334,9 @@
                 }
             }
             
-            canvas.addEventListener('click', (evt) => {
+            function processClick(evt) {
                 if (transition.active) return;
-                const mousePos = getMousePos(canvas, evt);
+                const mousePos = getMousePos(evt.currentTarget, evt);
                 if (state.current === state.getReady && isInside(mousePos, ui.playRect)) {
                     transition.start(state.instructions);
                 } else if (state.current === state.over && gameOverSequence.step === 4 && isInside(mousePos, ui.replayRect)) {
@@ -309,7 +344,10 @@
                 } else {
                     handleInput();
                 }
-            });
+            }
+            
+            canvas.addEventListener('click', processClick);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); processClick(e); }, { passive: false });
             
             document.addEventListener('keydown', (e) => { if (e.code === 'Space') handleInput(); });
             
