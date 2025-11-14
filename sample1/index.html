@@ -9,11 +9,14 @@
         html, body {
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Prevents scroll bars */
+            overflow: hidden; /* Absolutely no scrollbars */
+            width: 100%;
             height: 100%;
             background-color: #333;
         }
-        body {
+        #game-container {
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -22,6 +25,10 @@
             border: 2px solid #000;
             background-color: #70c5ce;
             cursor: pointer;
+            /* Let JS handle the exact size */
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
             /* Disables unwanted mobile behaviors */
             touch-action: none;
             -webkit-tap-highlight-color: transparent;
@@ -31,29 +38,33 @@
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="288" height="512"></canvas>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="288" height="512"></canvas>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
 
         // --- Responsive Canvas Scaling ---
         function resizeGame() {
             const gameRatio = canvas.width / canvas.height;
-            const windowRatio = window.innerWidth / window.innerHeight;
+            const containerRatio = gameContainer.clientWidth / gameContainer.clientHeight;
             
-            if (windowRatio < gameRatio) {
-                // Window is taller than game
-                canvas.style.width = window.innerWidth + 'px';
-                canvas.style.height = (window.innerWidth / gameRatio) + 'px';
+            if (containerRatio < gameRatio) {
+                // Container is taller/skinnier than game
+                canvas.style.width = gameContainer.clientWidth + 'px';
+                canvas.style.height = (gameContainer.clientWidth / gameRatio) + 'px';
             } else {
-                // Window is wider than game
-                canvas.style.height = window.innerHeight + 'px';
-                canvas.style.width = (window.innerHeight * gameRatio) + 'px';
+                // Container is wider/shorter than game
+                canvas.style.height = gameContainer.clientHeight + 'px';
+                canvas.style.width = (gameContainer.clientHeight * gameRatio) + 'px';
             }
         }
         window.addEventListener('resize', resizeGame);
-        resizeGame(); // Initial resize
+        window.addEventListener('orientationchange', resizeGame);
+        resizeGame();
 
         // --- Asset URLs ---
         const assets = {
@@ -235,7 +246,7 @@
             
             const ui = {
                 titleSize: { w: 225, h: 45 }, panelSize: { w: 225, h: 112 },
-                buttonSize: { w: 150, h: 150 }, tapSymbolSize: { w: 80, h: 70 },
+                buttonSize: { w: 100, h: 58 }, tapSymbolSize: { w: 80, h: 70 },
                 tapSymbolAlpha: 1.0, isFadingTapSymbol: false,
                 
                 get playRect() { return { x: (canvas.width - this.buttonSize.w) / 2, y: 280, ...this.buttonSize }; },
@@ -313,18 +324,17 @@
                 ctx.fillStyle = "#FFF"; ctx.fillText(text, x, y);
             }
 
-            function getMousePos(canvas, evt) {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                // For touch events, get the first touch
+            function getMousePos(canvasEl, evt) {
+                const rect = canvasEl.getBoundingClientRect();
+                const scaleX = canvasEl.width / rect.width;
+                const scaleY = canvasEl.height / rect.height;
                 const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
                 const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
                 return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
             }
             function isInside(pos, rect) { return pos.x > rect.x && pos.x < rect.x + rect.w && pos.y < rect.y + rect.h && pos.y > rect.y; }
 
-            function handleInput(evt) {
+            function handleInput() {
                 if (state.current === state.instructions || state.current === state.game) {
                     if (state.current === state.instructions) {
                         ui.isFadingTapSymbol = true;
@@ -336,10 +346,10 @@
             
             function processClick(evt) {
                 if (transition.active) return;
-                const mousePos = getMousePos(evt.currentTarget, evt);
-                if (state.current === state.getReady && isInside(mousePos, ui.playRect)) {
+                const pos = getMousePos(canvas, evt);
+                if (state.current === state.getReady && isInside(pos, ui.playRect)) {
                     transition.start(state.instructions);
-                } else if (state.current === state.over && gameOverSequence.step === 4 && isInside(mousePos, ui.replayRect)) {
+                } else if (state.current === state.over && gameOverSequence.step === 4 && isInside(pos, ui.replayRect)) {
                     transition.start(state.getReady);
                 } else {
                     handleInput();
