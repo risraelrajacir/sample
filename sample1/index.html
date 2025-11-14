@@ -17,27 +17,24 @@
             margin: 0;
             overflow: hidden;
             display: flex;
-            flex-direction: column; /* Key change for layout */
+            flex-direction: column; /* Allow vertical alignment */
+            justify-content: center;
+            align-items: center;
             height: 100vh;
             width: 100vw;
             touch-action: none;
             -webkit-user-select: none;
             user-select: none;
         }
-        #game-area {
-            flex-grow: 1; /* Takes up available space */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            min-height: 0; /* Prevents flex overflow */
-        }
         #game-container {
             position: relative;
             width: 512px;
-            height: 572px;
+            height: 572px; /* Fixed aspect ratio */
+            max-width: 100vw;
+            max-height: 85vh; /* Limit height to leave space for joystick */
             box-shadow: 0 0 25px rgba(0,0,0,0.5);
             overflow: hidden;
+            flex-shrink: 0; /* Prevent container from shrinking */
         }
         canvas {
             width: 100%;
@@ -45,20 +42,19 @@
             display: block;
             image-rendering: pixelated;
         }
-        #controls-area {
-            flex-shrink: 0;
+        #joystick-area {
+            flex-grow: 1;
             width: 100%;
-            padding-bottom: 20px;
-            display: none; /* Hidden by default, shown via media query */
+            display: none; /* Hidden by default */
             justify-content: center;
             align-items: center;
         }
         #joystick-container {
+            position: relative;
             width: 120px;
             height: 120px;
             background: rgba(0,0,0,0.2);
             border-radius: 50%;
-            position: relative;
         }
         #joystick-knob {
             position: absolute;
@@ -69,10 +65,13 @@
             top: 30px;
             left: 30px;
             border: 2px solid rgba(255,255,255,0.5);
-            transition: transform 0.1s ease-out;
+            transition: transform 0.1s ease-out; /* Smooth return to center */
         }
         @media (hover: none) and (pointer: coarse) {
-            #controls-area {
+             body {
+                justify-content: flex-start; /* Align game to top on mobile */
+             }
+            #joystick-area {
                 display: flex;
             }
         }
@@ -80,20 +79,18 @@
 </head>
 <body>
 
-<div id="game-area">
-    <div id="game-container">
-        <canvas id="gameCanvas" width="512" height="572"></canvas>
-    </div>
+<div id="game-container">
+    <canvas id="gameCanvas" width="512" height="572"></canvas>
 </div>
-<div id="controls-area">
+<div id="joystick-area">
     <div id="joystick-container">
         <div id="joystick-knob"></div>
     </div>
 </div>
 
+
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
-        const gameArea = document.getElementById('game-area');
         const gameContainer = document.getElementById('game-container');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -366,7 +363,7 @@
             joyStick.startY = e.touches[0].clientY;
         }, { passive: false });
 
-        joystickContainer.addEventListener('touchmove', (e) => {
+        window.addEventListener('touchmove', (e) => {
             if (!joyStick.active || gameState !== 'PLAYING') return;
             e.preventDefault();
             const dx = e.touches[0].clientX - joyStick.startX;
@@ -379,11 +376,11 @@
 
             let moved = false;
             if (Math.abs(dx) > Math.abs(dy)) {
-                if (dx > 30 && direction.x === 0) { nextDirection = { x: 1, y: 0 }; moved = true; } 
-                else if (dx < -30 && direction.x === 0) { nextDirection = { x: -1, y: 0 }; moved = true; }
+                if (dx > 20 && direction.x === 0) { nextDirection = { x: 1, y: 0 }; moved = true; } 
+                else if (dx < -20 && direction.x === 0) { nextDirection = { x: -1, y: 0 }; moved = true; }
             } else {
-                if (dy > 30 && direction.y === 0) { nextDirection = { x: 0, y: 1 }; moved = true; } 
-                else if (dy < -30 && direction.y === 0) { nextDirection = { x: 0, y: -1 }; moved = true; }
+                if (dy > 20 && direction.y === 0) { nextDirection = { x: 0, y: 1 }; moved = true; } 
+                else if (dy < -20 && direction.y === 0) { nextDirection = { x: 0, y: -1 }; moved = true; }
             }
             if (moved) {
                 assets.sounds.move.play();
@@ -392,26 +389,28 @@
             }
         }, { passive: false });
 
-        joystickContainer.addEventListener('touchend', () => {
+        window.addEventListener('touchend', () => {
              joyStick.active = false;
              joystickKnob.style.transform = `translate(0px, 0px)`;
         });
 
         function resizeGame() {
             const viewportW = window.innerWidth;
-            const viewportH = document.body.clientHeight; // Use body client height
+            const viewportH = document.documentElement.clientHeight;
             const gameAspect = canvasWidth / canvasHeight;
+
+            let availableHeight = viewportH;
+            if ( 'ontouchstart' in window ) {
+                 // On mobile, subtract joystick area height if it's visible
+                 availableHeight -= document.getElementById('joystick-area').offsetHeight;
+            }
+
             let newW, newH;
-
-            // Target the container within the flexbox item #game-area
-            const availableW = gameArea.clientWidth;
-            const availableH = gameArea.clientHeight;
-
-            if (availableW / availableH > gameAspect) {
-                newH = availableH;
+            if (viewportW / availableHeight > gameAspect) {
+                newH = availableHeight;
                 newW = newH * gameAspect;
             } else {
-                newW = availableW;
+                newW = viewportW;
                 newH = newW / gameAspect;
             }
             gameContainer.style.width = `${newW}px`;
@@ -424,7 +423,6 @@
         document.addEventListener('keydown', handleKeyInput);
         canvas.addEventListener('click', handleClick);
         window.addEventListener('resize', resizeGame);
-        
         resizeGame();
     });
 </script>
