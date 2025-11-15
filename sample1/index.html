@@ -3,415 +3,375 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snake</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Lilita+One&display=swap" rel="stylesheet">
+    <title>Flappy Bird</title>
     <style>
-        :root {
-            --font-title: 'Luckiest Guy', cursive;
-            --font-ui: 'Lilita One', cursive;
-        }
-        body {
-            background-color: #1a1a1a;
+        /* CSS to ensure full screen, no scroll, and centered content */
+        html, body {
             margin: 0;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            /* MODIFIED: Align game to the top */
-            align-items: flex-start;
-            padding-top: 2vh; /* Add some space at the very top */
-            box-sizing: border-box;
-            height: 100vh;
-            width: 100vw;
-            touch-action: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        #game-container {
-            position: relative;
-            width: 512px;
-            height: 572px; /* Fixed aspect ratio */
-            max-width: 100vw;
-            max-height: 95vh; /* Ensure it doesn't overlap joystick */
-            box-shadow: 0 0 25px rgba(0,0,0,0.5);
-            overflow: hidden;
-        }
-        canvas {
+            padding: 0;
+            overflow: hidden; /* Absolutely no scrollbars */
             width: 100%;
             height: 100%;
-            display: block;
-            image-rendering: pixelated;
+            background-color: #333;
         }
-        /* MODIFIED: Joystick is now outside game-container, positioned relative to the screen */
-        #joystick-container {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 120px;
-            height: 120px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 50%;
-            display: none;
-            z-index: 200;
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        #joystick-knob {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 50%;
-            top: 30px;
-            left: 30px;
-            border: 2px solid rgba(255,255,255,0.5);
-        }
-        @media (hover: none) and (pointer: coarse) {
-            #joystick-container {
-                display: block;
-            }
+        canvas {
+            border: 2px solid #000;
+            background-color: #70c5ce;
+            cursor: pointer;
+            /* Let JS handle the exact size */
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            /* Disables unwanted mobile behaviors */
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
         }
     </style>
 </head>
 <body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="288" height="512"></canvas>
+    </div>
 
-<div id="game-container">
-    <canvas id="gameCanvas" width="512" height="572"></canvas>
-</div>
-
-<!-- MODIFIED: Joystick is now a sibling to game-container -->
-<div id="joystick-container">
-    <div id="joystick-knob"></div>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', async () => {
-        const gameContainer = document.getElementById('game-container');
+    <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const joystickContainer = document.getElementById('joystick-container');
-        const joystickKnob = document.getElementById('joystick-knob');
+        const gameContainer = document.getElementById('game-container');
 
-        const gridSize = 32;
-        const initialSpeed = 8;
-        let currentSpeed = 8;
-        const canvasWidth = 512;
-        const canvasHeight = 572;
-        const gameAreaHeight = 512;
-        const uiBarHeight = 60;
-
-        await document.fonts.load("48px 'Luckiest Guy'");
-        await document.fonts.load("32px 'Lilita One'");
-
-        const assetUrls = {
-            images: { apple: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_cs/se_ge_1_as_cs_1/ae_ce.png?raw=true', playBtn: 'https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/py_ne_ui_bn.png?raw=true', replayBtn: 'https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/ry_ne_ui_bn.png?raw=true', head_up: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_up.png?raw=true', head_down: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_dn.png?raw=true', head_left: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_lt.png?raw=true', head_right: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_rt.png?raw=true', body_v: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_vl.png?raw=true', body_h: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_hl.png?raw=true', body_tl: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_tp_lt.png?raw=true', body_tr: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_tp_rt.png?raw=true', body_bl: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_bm_lt.png?raw=true', body_br: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_bm_rt.png?raw=true', tail_up: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_up.png?raw=true', tail_down: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_dn.png?raw=true', tail_left: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_lt.png?raw=true', tail_right: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_rt.png?raw=true' },
-            sounds: { background: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_mc/se_ge_1_as_mc_1/bg_mc_1.mp3', move: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_sd_es/se_ge_1_as_sd_es_1/me_sd_et_.mp3', eat: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_sd_es/se_ge_1_as_sd_es_1/fd_et_sd_et.mp3', gameOver: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_sd_es/se_ge_1_as_sd_es_1/ge_or_sd_et_.mp3' }
-        };
-        
-        const assets = { images: {}, sounds: {} };
-        Object.keys(assetUrls.images).forEach(key => { assets.images[key] = new Image(); assets.images[key].src = assetUrls.images[key]; });
-        Object.keys(assetUrls.sounds).forEach(key => { assets.sounds[key] = new Audio(assetUrls.sounds[key]); });
-        assets.sounds.background.loop = true;
-
-        let snake, apple, score, highScore, direction, nextDirection, gameState, gameLoopInterval;
-        
-        const playBtnRect = { x: canvasWidth / 2 - 75, y: canvasHeight / 2 - 25, w: 150, h: 150 };
-        const replayBtnRect = { x: canvasWidth / 2 - 75, y: canvasHeight / 2 + 60, w: 150, h: 150 };
-
-        function init() {
-            snake = [{ x: 8, y: 8 }, { x: 7, y: 8 }, { x: 6, y: 8 }];
-            score = 0;
-            currentSpeed = initialSpeed;
-            direction = { x: 1, y: 0 };
-            nextDirection = { x: 1, y: 0 };
-            gameState = 'PLAYING';
-            spawnApple();
-            assets.sounds.background.currentTime = 0;
-            assets.sounds.background.play();
-            
-            clearInterval(gameLoopInterval);
-            gameLoopInterval = setInterval(gameLoop, 1000 / currentSpeed);
-            requestAnimationFrame(drawLoop); 
-        }
-        
-        function update() {
-            direction = nextDirection;
-            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-            const gridWidth = canvasWidth / gridSize;
-            const gridHeight = gameAreaHeight / gridSize;
-
-            if (head.x < 0 || head.x >= gridWidth || head.y < 0 || head.y >= gridHeight || snake.some(p => p.x === head.x && p.y === head.y)) {
-                endGame(); 
-                return;
-            }
-
-            snake.unshift(head);
-            if (head.x === apple.x && head.y === apple.y) {
-                score++;
-                if (score > highScore) {
-                    highScore = score;
-                    localStorage.setItem('snakeHighScore', highScore);
-                }
-                if (score > 0 && score % 5 === 0) {
-                    currentSpeed += 1.5;
-                    clearInterval(gameLoopInterval);
-                    gameLoopInterval = setInterval(gameLoop, 1000 / currentSpeed);
-                }
-                assets.sounds.eat.play();
-                spawnApple();
-            } else {
-                snake.pop();
-            }
-        }
-
-        function gameLoop() {
-            if (gameState !== 'PLAYING') return;
-            update();
-        }
-
-        function drawLoop(currentTime) {
-            draw(currentTime);
-            requestAnimationFrame(drawLoop);
-        }
-
-        function draw(currentTime) {
-            drawBackground();
-            if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
-                drawApple(currentTime);
-                drawSnake();
-                drawUIBar();
-            }
-            if (gameState === 'MENU') {
-                drawHomeScreen(currentTime);
-            } else if (gameState === 'GAMEOVER') {
-                drawGameOverScreen(currentTime);
-            }
-        }
-        
-        function drawBackground() {
-            ctx.fillStyle = '#4A752C';
-            ctx.fillRect(0, 0, canvasWidth, uiBarHeight);
-
-            for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) {
-                ctx.fillStyle = (i + j) % 2 === 0 ? '#a2d149' : '#aad751';
-                ctx.fillRect(i * gridSize, j * gridSize + uiBarHeight, gridSize, gridSize);
-            }
-        }
-
-        function drawUIBar() {
-            ctx.fillStyle = '#FFF';
-            ctx.font = "32px 'Lilita One'";
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.drawImage(assets.images.apple, 20, uiBarHeight / 2 - 16, 32, 32);
-            ctx.fillText(score, 65, uiBarHeight / 2 + 2);
-        }
-
-        function drawApple(currentTime) {
-            if (!apple) return;
-            const scale = 1 + Math.sin(currentTime / 200) * 0.1;
-            const scaledSize = gridSize * scale;
-            const offset = (gridSize - scaledSize) / 2;
-            ctx.drawImage(assets.images.apple, apple.x * gridSize + offset, apple.y * gridSize + uiBarHeight + offset, scaledSize, scaledSize);
-        }
-        
-        function getSegmentImage(index) {
-            const segment = snake[index];
-            const segmentBefore = snake[index - 1];
-            const segmentAfter = snake[index + 1];
-
-            if (index === 0) {
-                if (direction.x === 1) return assets.images.head_right;
-                if (direction.x === -1) return assets.images.head_left;
-                if (direction.y === 1) return assets.images.head_down;
-                if (direction.y === -1) return assets.images.head_up;
-            } else if (!segmentAfter) {
-                const from = segmentBefore;
-                if (from.x < segment.x) return assets.images.tail_right;
-                if (from.x > segment.x) return assets.images.tail_left;
-                if (from.y < segment.y) return assets.images.tail_down;
-                if (from.y > segment.y) return assets.images.tail_up;
-            } else {
-                if (segmentBefore.x === segmentAfter.x) return assets.images.body_v;
-                if (segmentBefore.y === segmentAfter.y) return assets.images.body_h;
-                const p = segmentBefore, n = segmentAfter, c = segment;
-                if ((p.y < c.y && n.x < c.x) || (p.x < c.x && n.y < c.y)) return assets.images.body_tl;
-                if ((p.y < c.y && n.x > c.x) || (p.x > c.x && n.y < c.y)) return assets.images.body_tr;
-                if ((p.y > c.y && n.x < c.x) || (p.x < c.x && n.y > c.y)) return assets.images.body_bl;
-                if ((p.y > c.y && n.x > c.x) || (p.x > c.x && n.y > c.y)) return assets.images.body_br;
-            }
-            return null;
-        }
-
-        function drawSnake() {
-            if (!snake) return;
-            snake.forEach((segment, index) => {
-                const img = getSegmentImage(index);
-                if (img && img.complete) {
-                    ctx.drawImage(img, segment.x * gridSize, segment.y * gridSize + uiBarHeight, gridSize, gridSize);
-                }
-            });
-        }
-        
-        function drawHomeScreen(currentTime) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            
-            ctx.font = "90px 'Luckiest Guy'";
-            ctx.fillStyle = '#87D37C';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 8;
-            ctx.strokeText("SNAKE", canvasWidth / 2, canvasHeight / 2 - 120);
-            ctx.fillText("SNAKE", canvasWidth / 2, canvasHeight / 2 - 120);
-
-            const scale = 1 + Math.sin(currentTime / 300) * 0.05;
-            const w = playBtnRect.w * scale;
-            const h = playBtnRect.h * scale;
-            const x = playBtnRect.x - (w - playBtnRect.w) / 2;
-            const y = playBtnRect.y - (h - playBtnRect.h) / 2;
-            ctx.drawImage(assets.images.playBtn, x, y, w, h);
-        }
-        
-        function drawGameOverScreen(currentTime) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-            ctx.font = "80px 'Luckiest Guy'";
-            ctx.fillStyle = '#E74C3C';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 7;
-            ctx.strokeText("GAME OVER", canvasWidth / 2, canvasHeight / 2 - 140);
-            ctx.fillText("GAME OVER", canvasWidth / 2, canvasHeight / 2 - 140);
-            
-            const panelX = canvasWidth / 2 - 150, panelY = canvasHeight / 2 - 60, panelW = 300, panelH = 110;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(panelX, panelY, panelW, panelH, 20);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.font = "32px 'Lilita One'";
-            ctx.fillStyle = '#fff';
-            ctx.textAlign = 'left';
-            ctx.fillText(`Score: ${score}`, panelX + 30, panelY + 35);
-            ctx.fillText(`Best: ${highScore}`, panelX + 30, panelY + 75);
-
-            const scale = 1 + Math.sin(currentTime / 300) * 0.05;
-            const w = replayBtnRect.w * scale;
-            const h = replayBtnRect.h * scale;
-            const x = replayBtnRect.x - (w - replayBtnRect.w) / 2;
-            const y = replayBtnRect.y - (h - replayBtnRect.h) / 2;
-            ctx.drawImage(assets.images.replayBtn, x, y, w, h);
-        }
-
-        function spawnApple() {
-            const gridWidth = canvasWidth / gridSize;
-            const gridHeight = gameAreaHeight / gridSize;
-            do { apple = { x: Math.floor(Math.random() * gridWidth), y: Math.floor(Math.random() * gridHeight) }; } 
-            while (snake.some(p => p.x === apple.x && p.y === apple.y));
-        }
-
-        function endGame() {
-            if (gameState === 'GAMEOVER') return;
-            gameState = 'GAMEOVER';
-            clearInterval(gameLoopInterval);
-            assets.sounds.background.pause();
-            assets.sounds.gameOver.play();
-        }
-        
-        function handleKeyInput(e) {
-            if (gameState !== 'PLAYING') return;
-            const key = e.key;
-            let moved = false;
-            if ((key === 'ArrowLeft' || key.toLowerCase() === 'a') && direction.x === 0) { nextDirection = { x: -1, y: 0 }; moved = true; }
-            if ((key === 'ArrowUp' || key.toLowerCase() === 'w') && direction.y === 0) { nextDirection = { x: 0, y: -1 }; moved = true; }
-            if ((key === 'ArrowRight' || key.toLowerCase() === 'd') && direction.x === 0) { nextDirection = { x: 1, y: 0 }; moved = true; }
-            if ((key === 'ArrowDown' || key.toLowerCase() === 's') && direction.y === 0) { nextDirection = { x: 0, y: 1 }; moved = true; }
-            if (moved) assets.sounds.move.play();
-        }
-
-        function handleClick(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
-
-            if (gameState === 'MENU' && x > playBtnRect.x && x < playBtnRect.x + playBtnRect.w && y > playBtnRect.y && y < playBtnRect.y + playBtnRect.h) {
-                init();
-            } else if (gameState === 'GAMEOVER' && x > replayBtnRect.x && x < replayBtnRect.x + replayBtnRect.w && y > replayBtnRect.y && y < replayBtnRect.y + replayBtnRect.h) {
-                init();
-            }
-        }
-        
-        let joyStick = {startX: 0, startY: 0, active: false};
-        joystickContainer.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (gameState !== 'PLAYING') return;
-            joyStick.active = true;
-        }, { passive: false });
-
-        joystickContainer.addEventListener('touchmove', (e) => {
-            if (!joyStick.active || gameState !== 'PLAYING') return;
-            e.preventDefault();
-
-            const rect = joystickContainer.getBoundingClientRect();
-            const touch = e.touches[0];
-            const dx = touch.clientX - (rect.left + rect.width / 2);
-            const dy = touch.clientY - (rect.top + rect.height / 2);
-            
-            const maxMove = joystickContainer.clientWidth / 2;
-            const angle = Math.atan2(dy, dx);
-            const distance = Math.min(maxMove, Math.hypot(dx, dy));
-            
-            const knobX = Math.cos(angle) * (distance - joystickKnob.clientWidth / 2);
-            const knobY = Math.sin(angle) * (distance - joystickKnob.clientWidth / 2);
-            joystickKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
-
-            let moved = false;
-            if (Math.abs(dx) > Math.abs(dy)) {
-                if (dx > 20 && direction.x === 0) { nextDirection = { x: 1, y: 0 }; moved = true; } 
-                else if (dx < -20 && direction.x === 0) { nextDirection = { x: -1, y: 0 }; moved = true; }
-            } else {
-                if (dy > 20 && direction.y === 0) { nextDirection = { x: 0, y: 1 }; moved = true; } 
-                else if (dy < -20 && direction.y === 0) { nextDirection = { x: 0, y: -1 }; moved = true; }
-            }
-            if (moved) {
-                assets.sounds.move.play();
-                joyStick.active = false;
-                joystickKnob.style.transform = `translate(0px, 0px)`;
-            }
-        }, { passive: false });
-
-        joystickContainer.addEventListener('touchend', () => {
-             joyStick.active = false;
-             joystickKnob.style.transform = `translate(0px, 0px)`;
-        });
-
+        // --- Responsive Canvas Scaling ---
         function resizeGame() {
-            const viewportW = window.innerWidth, viewportH = window.innerHeight;
-            const gameAspect = canvasWidth / canvasHeight;
-            let newW, newH;
-            if (viewportW / viewportH > gameAspect) { newH = viewportH; newW = newH * gameAspect; } 
-            else { newW = viewportW; newH = newW / gameAspect; }
-            gameContainer.style.width = `${newW}px`;
-            gameContainer.style.height = `${newH}px`;
+            const gameRatio = canvas.width / canvas.height;
+            const containerRatio = gameContainer.clientWidth / gameContainer.clientHeight;
+            
+            if (containerRatio < gameRatio) {
+                // Container is taller/skinnier than game
+                canvas.style.width = gameContainer.clientWidth + 'px';
+                canvas.style.height = (gameContainer.clientWidth / gameRatio) + 'px';
+            } else {
+                // Container is wider/shorter than game
+                canvas.style.height = gameContainer.clientHeight + 'px';
+                canvas.style.width = (gameContainer.clientHeight * gameRatio) + 'px';
+            }
+        }
+        window.addEventListener('resize', resizeGame);
+        window.addEventListener('orientationchange', resizeGame);
+        resizeGame();
+
+        // --- Asset URLs ---
+        const assets = {
+            bird: [
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_1.png?raw=true",
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_2.png?raw=true",
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_3.png?raw=true",
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_4.png?raw=true"
+            ],
+            background: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bgs/bd_ge_1_as_bgs_1/bg_dy_1.png?raw=true",
+            base: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bes/bd_ge_1_as_bes_1/gd_1.png?raw=true",
+            pipeTop: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_ps/bd_ge_1_as_ps_1/gn_pe_tp.png?raw=true",
+            pipeBottom: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_ps/bd_ge_1_as_ps_1/gn_pe_bm.png?raw=true",
+            uiBackground: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/UIbg.png?raw=true",
+            getReady: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tt_Gt_Ry_ui.png?raw=true",
+            gameOver: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tt_Ge_Or_ui.png?raw=true",
+            playButton: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/py_ne_ui_bn.png?raw=true",
+            replayButton: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/ry_ne_ui_bn.png?raw=true",
+            tapSymbol: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tp_sl_ui.png?raw=true",
+            tapTickSymbol: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tp_Tk_ui.png?raw=true",
+            swoosh: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/sh_sd_et.mp3",
+            flap: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/fp_sd_et.mp3",
+            point: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/pt_sd_et.mp3",
+            hit: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/ht_sd_et.mp3",
+            die: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/de_sd_et.mp3"
+        };
+
+        const images = {};
+        const sounds = {};
+        let assetsToLoad = 0;
+
+        function assetLoaded() {
+            assetsToLoad--;
+            if (assetsToLoad === 0) {
+                main();
+            }
+        }
+
+        function loadAssets() {
+            ctx.fillStyle = "black"; ctx.font = "20px Arial"; ctx.textAlign = "center";
+            ctx.fillText("Loading...", canvas.width/2, canvas.height/2);
+            
+            const imageKeys = ['background', 'base', 'pipeTop', 'pipeBottom', 'uiBackground', 'getReady', 'gameOver', 'playButton', 'replayButton', 'tapSymbol', 'tapTickSymbol'];
+            assetsToLoad = imageKeys.length + assets.bird.length;
+            
+            imageKeys.forEach(key => { images[key] = new Image(); images[key].src = assets[key]; images[key].onload = assetLoaded; });
+            images.bird = assets.bird.map(src => { const img = new Image(); img.src = src; img.onload = assetLoaded; return img; });
+            for (const key of ['swoosh', 'flap', 'point', 'hit', 'die']) { sounds[key] = new Audio(assets[key]); }
         }
         
-        highScore = localStorage.getItem('snakeHighScore') || 0;
-        gameState = 'MENU';
-        requestAnimationFrame(drawLoop); 
-        document.addEventListener('keydown', handleKeyInput);
-        canvas.addEventListener('click', handleClick);
-        window.addEventListener('resize', resizeGame);
-        resizeGame();
-    });
-</script>
+        function main() {
+            let frames = 0;
+            const DEGREE = Math.PI / 180;
+            const state = { current: 0, getReady: 0, instructions: 1, game: 2, over: 3 };
+
+            const flash = {
+                alpha: 0, speed: 0.1,
+                start: function() { this.alpha = 0.7; },
+                update: function() { this.alpha = Math.max(0, this.alpha - this.speed); },
+                draw: function() {
+                    if (this.alpha > 0) {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                },
+                reset: function() { this.alpha = 0; }
+            };
+
+            const transition = {
+                alpha: 0, speed: 0.05, active: false, targetState: -1,
+                start: function(target) {
+                    if (this.active) return;
+                    this.active = true; this.isFadingOut = true; this.targetState = target; sounds.swoosh.play();
+                },
+                update: function() {
+                    if (!this.active) return;
+                    if (this.isFadingOut) {
+                        this.alpha = Math.min(1, this.alpha + this.speed);
+                        if (this.alpha >= 1) {
+                            this.isFadingOut = false; this.isFadingIn = true;
+                            if (state.current === state.over) resetGame();
+                            state.current = this.targetState;
+                        }
+                    } else if (this.isFadingIn) {
+                        this.alpha = Math.max(0, this.alpha - this.speed);
+                        if (this.alpha <= 0) { this.isFadingIn = false; this.active = false; }
+                    }
+                },
+                draw: function() {
+                    if (this.alpha > 0) {
+                        ctx.fillStyle = `rgba(0, 0, 0, ${this.alpha})`;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                }
+            };
+
+            const bg = { draw: () => ctx.drawImage(images.background, 0, 0, canvas.width, canvas.height) };
+            
+            const base = {
+                x: 0, y: canvas.height - 112, w: 336, h: 112, dx: 2,
+                draw: function() {
+                    ctx.drawImage(images.base, this.x, this.y, this.w, this.h);
+                    ctx.drawImage(images.base, this.x + this.w, this.y, this.w, this.h);
+                },
+                update: function() {
+                    if (state.current !== state.over) {
+                        this.x -= this.dx;
+                        if (this.x <= -this.w) this.x = 0;
+                    }
+                }
+            };
+
+            const bird = {
+                x: 80, y: 190, w: 34, h: 24, frame: 0,
+                gravity: 0.20, jump: 4.2, speed: 0, rotation: 0,
+                draw: function() {
+                    let birdImg = images.bird[this.frame];
+                    ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation);
+                    ctx.drawImage(birdImg, -this.w / 2, -this.h / 2, this.w, this.h);
+                    ctx.restore();
+                },
+                flap: function() { this.speed = -this.jump; },
+                update: function() {
+                    if (state.current === state.getReady || state.current === state.instructions) {
+                        this.frame = Math.floor((frames / 5) % images.bird.length);
+                        this.y = 190 + Math.sin(frames * DEGREE * 5) * 8;
+                        this.rotation = 0;
+                    } else {
+                        if (state.current !== state.over || this.y < base.y - this.h/2) {
+                            this.speed += this.gravity;
+                            this.y += this.speed;
+                        }
+
+                        if (this.y + this.h / 2 >= base.y) {
+                            this.y = base.y - this.h / 2;
+                            if (state.current === state.game) {
+                                state.current = state.over; sounds.hit.play(); flash.start(); gameOverSequence.start();
+                            }
+                        }
+
+                        if (state.current === state.over) {
+                            this.frame = 1;
+                            if (this.y < base.y - this.h/2) {
+                               this.rotation = Math.min(90 * DEGREE, this.rotation + 4 * DEGREE);
+                            }
+                        } else {
+                            this.frame = Math.floor((frames / 5) % images.bird.length);
+                            if (this.speed >= 0) {
+                                this.rotation = Math.min(90 * DEGREE, this.rotation + 4 * DEGREE);
+                            } else {
+                                this.rotation = -25 * DEGREE;
+                            }
+                        }
+                    }
+                },
+                reset: function() { this.speed = 0; this.y = 190; }
+            };
+
+            const pipes = {
+                position: [], w: 52, h: 320, gap: 100, maxYPos: -40, dx: 2,
+                draw: function() { for (let p of this.position) { ctx.drawImage(images.pipeTop, p.x, p.y); ctx.drawImage(images.pipeBottom, p.x, p.y + this.h + this.gap); }},
+                update: function() {
+                    if (state.current !== state.game) return;
+                    if (frames % 100 === 0) this.position.push({ x: canvas.width, y: this.maxYPos - (Math.random() * 200), passed: false });
+                    for (let i = this.position.length - 1; i >= 0; i--) {
+                        let p = this.position[i];
+                        p.x -= this.dx;
+                        let b = { left: bird.x - bird.w/2, right: bird.x + bird.w/2, top: bird.y - bird.h/2, bottom: bird.y + bird.h/2 };
+                        if (b.right > p.x && b.left < p.x + this.w && (b.top < p.y + this.h || b.bottom > p.y + this.h + this.gap)) {
+                            state.current = state.over; sounds.hit.play(); sounds.die.play(); flash.start(); gameOverSequence.start();
+                            bird.speed = 0;
+                        }
+                        if (p.x + this.w < bird.x && !p.passed) { score.value++; sounds.point.play(); p.passed = true; }
+                        if (p.x + this.w < 0) this.position.splice(i, 1);
+                    }
+                },
+                reset: function() { this.position = []; }
+            };
+            
+            const ui = {
+                titleSize: { w: 225, h: 45 }, panelSize: { w: 225, h: 112 },
+                buttonSize: { w: 100, h: 58 }, tapSymbolSize: { w: 80, h: 70 },
+                tapSymbolAlpha: 1.0, isFadingTapSymbol: false,
+                
+                get playRect() { return { x: (canvas.width - this.buttonSize.w) / 2, y: 280, ...this.buttonSize }; },
+                get replayRect() { return { x: (canvas.width - this.buttonSize.w) / 2, y: 310, ...this.buttonSize }; },
+
+                draw: function() {
+                    if (state.current === state.getReady) {
+                        this.drawPulsingButton(images.playButton, this.playRect, frames);
+                        ctx.drawImage(images.getReady, (canvas.width - this.titleSize.w) / 2, 100, this.titleSize.w, this.titleSize.h);
+                    } else if (state.current === state.instructions || this.isFadingTapSymbol) {
+                        this.drawTapAnimation();
+                    } else if (state.current === state.over) {
+                        gameOverSequence.draw();
+                    }
+                },
+                drawPulsingButton: function(image, rect, frameCount) {
+                    const pulse = Math.sin(frameCount * DEGREE * 5) * 0.05 + 1;
+                    ctx.save(); ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
+                    ctx.scale(pulse, pulse); ctx.drawImage(image, -rect.w / 2, -rect.h / 2, rect.w, rect.h); ctx.restore();
+                },
+                drawTapAnimation: function() {
+                    ctx.save(); ctx.globalAlpha = this.tapSymbolAlpha;
+                    let isTicked = Math.floor(frames / 20) % 2 === 0;
+                    let currentSymbol = isTicked ? images.tapTickSymbol : images.tapSymbol;
+                    let pulse = Math.sin(frames * DEGREE * 8) * 0.05 + 1;
+                    let w = this.tapSymbolSize.w * pulse, h = this.tapSymbolSize.h * pulse;
+                    ctx.drawImage(currentSymbol, (canvas.width - w) / 2, 250, w, h); ctx.restore();
+                },
+                update: function() {
+                    if (this.isFadingTapSymbol) {
+                        this.tapSymbolAlpha -= 0.05;
+                        if (this.tapSymbolAlpha <= 0) { this.isFadingTapSymbol = false; }
+                    }
+                },
+                reset: function() { this.tapSymbolAlpha = 1.0; this.isFadingTapSymbol = false; }
+            };
+
+            const gameOverSequence = {
+                step: 0, timer: 0, panelY: canvas.height, panelTargetY: 180, panelSpeed: 15,
+                start: function() { this.step = 1; this.timer = 0; },
+                update: function() {
+                    if (this.step === 0) return; this.timer++;
+                    if (this.step === 1 && this.timer > 30) { this.step = 2; }
+                    if (this.step === 2) {
+                        this.panelY = Math.max(this.panelTargetY, this.panelY - this.panelSpeed);
+                        if (this.panelY === this.panelTargetY) this.step = 3;
+                    }
+                    if (this.step === 3 && this.timer > 90) { this.step = 4; }
+                },
+                draw: function() {
+                    if (this.step >= 2) { ctx.drawImage(images.gameOver, (canvas.width - ui.titleSize.w) / 2, 120, ui.titleSize.w, ui.titleSize.h); }
+                    if (this.step >= 2) { ctx.drawImage(images.uiBackground, (canvas.width - ui.panelSize.w) / 2, this.panelY, ui.panelSize.w, ui.panelSize.h); }
+                    if (this.step === 4) { ui.drawPulsingButton(images.replayButton, ui.replayRect, frames); }
+                },
+                reset: function() { this.step = 0; this.timer = 0; this.panelY = canvas.height; }
+            };
+
+            const score = {
+                best: parseInt(localStorage.getItem('flappybird_best')) || 0, value: 0,
+                draw: function() {
+                    if (state.current === state.game) { drawTextWithShadow(this.value, canvas.width / 2, 50, "35px 'Arial Black', sans-serif", "center"); }
+                    else if (state.current === state.over && gameOverSequence.step >= 2) {
+                        drawTextWithShadow("Score", 80, gameOverSequence.panelY + 42, "20px 'Arial Black', sans-serif", "left");
+                        drawTextWithShadow("Best", 80, gameOverSequence.panelY + 82, "20px 'Arial Black', sans-serif", "left");
+                        drawTextWithShadow(this.value, 210, gameOverSequence.panelY + 42, "20px 'Arial Black', sans-serif", "right");
+                        drawTextWithShadow(this.best, 210, gameOverSequence.panelY + 82, "20px 'Arial Black', sans-serif", "right");
+                    }
+                },
+                reset: function() { if (this.value > this.best) { this.best = this.value; localStorage.setItem('flappybird_best', this.best); } this.value = 0; }
+            };
+            
+            function drawTextWithShadow(text, x, y, font, align){
+                ctx.font = font; ctx.textAlign = align;
+                ctx.fillStyle = "#000"; ctx.fillText(text, x + 2, y + 2);
+                ctx.fillStyle = "#FFF"; ctx.fillText(text, x, y);
+            }
+
+            function getMousePos(canvasEl, evt) {
+                const rect = canvasEl.getBoundingClientRect();
+                const scaleX = canvasEl.width / rect.width;
+                const scaleY = canvasEl.height / rect.height;
+                const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+                const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+                return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+            }
+            function isInside(pos, rect) { return pos.x > rect.x && pos.x < rect.x + rect.w && pos.y < rect.y + rect.h && pos.y > rect.y; }
+
+            function handleInput() {
+                if (state.current === state.instructions || state.current === state.game) {
+                    if (state.current === state.instructions) {
+                        ui.isFadingTapSymbol = true;
+                        state.current = state.game;
+                    }
+                    bird.flap(); sounds.flap.play();
+                }
+            }
+            
+            function processClick(evt) {
+                if (transition.active) return;
+                const pos = getMousePos(canvas, evt);
+                if (state.current === state.getReady && isInside(pos, ui.playRect)) {
+                    transition.start(state.instructions);
+                } else if (state.current === state.over && gameOverSequence.step === 4 && isInside(pos, ui.replayRect)) {
+                    transition.start(state.getReady);
+                } else {
+                    handleInput();
+                }
+            }
+            
+            canvas.addEventListener('click', processClick);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); processClick(e); }, { passive: false });
+            
+            document.addEventListener('keydown', (e) => { if (e.code === 'Space') handleInput(); });
+            
+            function resetGame() { bird.reset(); pipes.reset(); score.reset(); ui.reset(); flash.reset(); gameOverSequence.reset(); }
+            function update() { bird.update(); pipes.update(); base.update(); ui.update(); transition.update(); flash.update(); gameOverSequence.update(); }
+            function draw() { bg.draw(); pipes.draw(); bird.draw(); base.draw(); ui.draw(); score.draw(); flash.draw(); transition.draw(); }
+
+            function loop() {
+                update(); draw(); frames++; requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        loadAssets();
+    </script>
 </body>
 </html>
