@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Snake</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Lilita+One&display=swap" rel="stylesheet">
+    <!-- NO EXTERNAL FONT LINKS -->
     <style>
         :root {
-            --font-title: 'Luckiest Guy', cursive;
-            --font-ui: 'Lilita One', cursive;
+            /* FONT STACK: Modern, clean system fonts */
+            --font-title: 'Verdana', 'Geneva', 'Tahoma', sans-serif;
+            --font-ui: 'Verdana', 'Geneva', 'Tahoma', sans-serif;
         }
         body {
             background-color: #1a1a1a;
@@ -18,7 +17,7 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: center; /* Centered by default for desktop */
             align-items: center;
             height: 100vh;
             width: 100vw;
@@ -29,13 +28,12 @@
         #game-container {
             position: relative;
             width: 512px;
-            height: 572px; /* Fixed aspect ratio */
+            height: 572px;
             max-width: 100vw;
             max-height: 95vh;
             box-shadow: 0 0 25px rgba(0,0,0,0.5);
             overflow: hidden;
             flex-shrink: 0;
-            /* Added for screen shake effect */
             transition: transform 0.1s;
         }
         canvas {
@@ -59,6 +57,7 @@
             color: #ccc;
             font-family: var(--font-ui);
             font-size: 14px;
+            font-weight: bold;
         }
         #dpad-container {
             display: grid;
@@ -78,7 +77,7 @@
             align-items: center;
             transition: transform 0.1s ease, background-color 0.1s ease;
         }
-        .dpad-btn:active {
+        .dpad-btn.active {
             transform: scale(0.9);
             background: rgba(255,255,255,0.2);
         }
@@ -131,25 +130,43 @@
         const gameAreaHeight = 512;
         const uiBarHeight = 60;
 
-        await document.fonts.load("48px 'Luckiest Guy'");
-        await document.fonts.load("32px 'Lilita One'");
-
         const assetUrls = {
             images: { apple: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_cs/se_ge_1_as_cs_1/ae_ce.png?raw=true', playBtn: 'https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/py_ne_ui_bn.png?raw=true', replayBtn: 'https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/ry_ne_ui_bn.png?raw=true', head_up: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_up.png?raw=true', head_down: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_dn.png?raw=true', head_left: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_lt.png?raw=true', head_right: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_hd_rt.png?raw=true', body_v: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_vl.png?raw=true', body_h: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_hl.png?raw=true', body_tl: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_tp_lt.png?raw=true', body_tr: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_tp_rt.png?raw=true', body_bl: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_bm_lt.png?raw=true', body_br: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_by_bm_rt.png?raw=true', tail_up: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_up.png?raw=true', tail_down: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_dn.png?raw=true', tail_left: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_lt.png?raw=true', tail_right: 'https://github.com/Rajacajustin/gs_1/blob/main/se_ge_1/se_ge_1_as/se_ge_1_as_se/se_ge_1_as_se_1/se_tl_rt.png?raw=true' },
             sounds: { background: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_mc/se_ge_1_as_mc_1/bg_mc_1.mp3', move: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_sd_es/se_ge_1_as_sd_es_1/me_sd_et_.mp3', eat: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_sd_es/se_ge_1_as_sd_es_1/fd_et_sd_et.mp3', gameOver: 'https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_sd_es/se_ge_1_as_sd_es_1/ge_or_sd_et_.mp3' }
         };
         
         const assets = { images: {}, sounds: {} };
-        Object.keys(assetUrls.images).forEach(key => { assets.images[key] = new Image(); assets.images[key].src = assetUrls.images[key]; });
-        Object.keys(assetUrls.sounds).forEach(key => { assets.sounds[key] = new Audio(assetUrls.sounds[key]); });
-        assets.sounds.background.loop = true;
-
         let snake, apple, score, highScore, direction, nextDirection, gameState, gameLoopInterval;
         let countdown = { text: '', alpha: 0, scale: 1 };
         let gameOverAnim = { titleY: -100, panelY: -100, start: 0 };
         
         const playBtnRect = { x: canvasWidth / 2 - 75, y: canvasHeight / 2 - 25, w: 150, h: 150 };
         const replayBtnRect = { x: canvasWidth / 2 - 75, y: canvasHeight / 2 + 60, w: 150, h: 150 };
+
+        function preloadAssets() {
+            let loaded = 0;
+            const total = Object.keys(assetUrls.images).length + Object.keys(assetUrls.sounds).length;
+            const onAssetLoad = () => {
+                loaded++;
+                if (loaded === total) {
+                    assets.sounds.background.loop = true;
+                    gameState = 'MENU'; // Assets loaded, go to menu
+                }
+            };
+
+            for (const key in assetUrls.images) {
+                assets.images[key] = new Image();
+                assets.images[key].onload = onAssetLoad;
+                assets.images[key].onerror = onAssetLoad; // Count errors too so it doesn't get stuck
+                assets.images[key].src = assetUrls.images[key];
+            }
+            for (const key in assetUrls.sounds) {
+                assets.sounds[key] = new Audio();
+                assets.sounds[key].addEventListener('canplaythrough', onAssetLoad, { once: true });
+                assets.sounds[key].addEventListener('error', onAssetLoad, { once: true });
+                assets.sounds[key].src = assetUrls.sounds[key];
+            }
+        }
 
         function init() {
             snake = [{ x: 8, y: 8 }, { x: 7, y: 8 }, { x: 6, y: 8 }];
@@ -201,7 +218,12 @@
             }
 
             drawBackground();
-            if (gameState === 'PLAYING' || gameState === 'GAMEOVER' || gameState === 'COUNTDOWN' || gameState === 'GAMEOVER_ANIMATING') {
+            if (gameState === 'LOADING') {
+                ctx.font = "32px 'Lilita One'";
+                ctx.fillStyle = '#FFF';
+                ctx.textAlign = 'center';
+                ctx.fillText('Loading...', canvasWidth / 2, canvasHeight / 2);
+            } else if (gameState === 'PLAYING' || gameState === 'GAMEOVER' || gameState === 'COUNTDOWN' || gameState === 'GAMEOVER_ANIMATING') {
                 drawApple(currentTime);
                 drawSnake();
                 drawUIBar();
@@ -279,7 +301,7 @@
         }
         
         function drawHomeScreen(currentTime) {
-            ctx.font = "90px 'Luckiest Guy'";
+            ctx.font = "bold 90px 'Luckiest Guy'";
             ctx.fillStyle = '#87D37C';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -297,15 +319,11 @@
         }
         
         function drawGameOverScreen(currentTime, isFinal) {
-            if(isFinal) {
-                drawGameOverContent(gameOverAnim.titleY, gameOverAnim.panelY, currentTime);
-            } else {
-                drawGameOverContent(gameOverAnim.titleY, gameOverAnim.panelY, currentTime);
-            }
+            drawGameOverContent(gameOverAnim.titleY, gameOverAnim.panelY, currentTime);
         }
         
         function drawGameOverContent(titleY, panelY, currentTime) {
-            ctx.font = "80px 'Luckiest Guy'";
+            ctx.font = "bold 80px 'Luckiest Guy'";
             ctx.fillStyle = '#E74C3C';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -364,7 +382,7 @@
             if (countdown.alpha <= 0) return;
             ctx.save();
             ctx.globalAlpha = countdown.alpha;
-            ctx.font = "120px 'Luckiest Guy'";
+            ctx.font = "bold 120px 'Luckiest Guy'";
             ctx.fillStyle = '#FFC700';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -419,7 +437,7 @@
             const gridWidth = canvasWidth / gridSize;
             const gridHeight = gameAreaHeight / gridSize;
             do { apple = { x: Math.floor(Math.random() * gridWidth), y: Math.floor(Math.random() * gridHeight) }; } 
-            while (snake.some(p => p.x === apple.x && p.y === apple.y));
+            while (snake && snake.some(p => p.x === apple.x && p.y === apple.y));
         }
 
         function endGame() {
@@ -451,8 +469,14 @@
         ['up-btn', 'down-btn', 'left-btn', 'right-btn'].forEach(id => {
             const btn = document.getElementById(id);
             const dir = { 'up-btn': {x:0, y:-1}, 'down-btn': {x:0, y:1}, 'left-btn': {x:-1, y:0}, 'right-btn': {x:1, y:0} }[id];
-            btn.addEventListener('touchstart', (e) => { e.preventDefault(); setDirection(dir); }, { passive: false });
-            btn.addEventListener('click', () => setDirection(dir));
+            
+            const press = (e) => { e.preventDefault(); btn.classList.add('active'); setDirection(dir); };
+            const release = (e) => { e.preventDefault(); btn.classList.remove('active'); };
+            
+            btn.addEventListener('touchstart', press, { passive: false });
+            btn.addEventListener('touchend', release, { passive: false });
+            btn.addEventListener('touchcancel', release, { passive: false });
+            btn.addEventListener('mousedown', () => setDirection(dir));
         });
 
         let touchStartX = 0, touchStartY = 0, lastSwipeDirection = null;
@@ -462,26 +486,17 @@
         }, { passive: false });
 
         window.addEventListener('touchmove', (e) => {
-            if (gameState !== 'PLAYING' || e.target.closest('#mobile-controls-container')) return;
+            if (gameState !== 'PLAYING' || !touchStartX || !touchStartY || e.target.closest('#mobile-controls-container')) return;
             const dx = e.touches[0].clientX - touchStartX;
             const dy = e.touches[0].clientY - touchStartY;
-            const threshold = 30;
-            let currentDirection;
-            if (Math.abs(dx) > Math.abs(dy)) {
-                if (Math.abs(dx) > threshold) {
-                    currentDirection = dx > 0 ? 'right' : 'left';
-                    if (lastSwipeDirection !== currentDirection) {
-                        setDirection({ x: dx > 0 ? 1 : -1, y: 0 });
-                        lastSwipeDirection = currentDirection;
-                    }
-                }
-            } else {
-                 if (Math.abs(dy) > threshold) {
-                    currentDirection = dy > 0 ? 'down' : 'up';
-                     if (lastSwipeDirection !== currentDirection) {
-                        setDirection({ x: 0, y: dy > 0 ? 1 : -1 });
-                        lastSwipeDirection = currentDirection;
-                    }
+
+            if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    const dir = dx > 0 ? 'right' : 'left';
+                    if (lastSwipeDirection !== dir) { setDirection({ x: dx > 0 ? 1 : -1, y: 0 }); lastSwipeDirection = dir; }
+                } else {
+                    const dir = dy > 0 ? 'down' : 'up';
+                    if (lastSwipeDirection !== dir) { setDirection({ x: 0, y: dy > 0 ? 1 : -1 }); lastSwipeDirection = dir; }
                 }
             }
         }, { passive: false });
@@ -511,10 +526,11 @@
         }
         
         highScore = localStorage.getItem('snakeHighScore') || 0;
-        gameState = 'MENU';
+        gameState = 'LOADING'; // Start in LOADING state
         requestAnimationFrame(drawLoop); 
         window.addEventListener('resize', resizeGame);
         resizeGame();
+        preloadAssets(); // Start loading assets
     });
 </script>
 </body>
