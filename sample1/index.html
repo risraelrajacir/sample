@@ -17,11 +17,9 @@
             margin: 0;
             overflow: hidden;
             display: flex;
-            flex-direction: column; /* Allow items to stack vertically */
-            justify-content: flex-start; /* Align game to the top */
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            padding-top: 1vh;
-            box-sizing: border-box;
             height: 100vh;
             width: 100vw;
             touch-action: none;
@@ -33,10 +31,12 @@
             width: 512px;
             height: 572px; /* Fixed aspect ratio */
             max-width: 100vw;
-            max-height: 80vh; /* Make room for controls at the bottom */
+            max-height: 95vh;
             box-shadow: 0 0 25px rgba(0,0,0,0.5);
             overflow: hidden;
-            flex-shrink: 0; /* Prevent container from shrinking */
+            flex-shrink: 0;
+            /* Added for screen shake effect */
+            transition: transform 0.1s;
         }
         canvas {
             width: 100%;
@@ -49,7 +49,7 @@
             bottom: 10px;
             left: 0;
             width: 100%;
-            display: none; /* Hidden by default */
+            display: none;
             flex-direction: column;
             align-items: center;
             gap: 10px;
@@ -76,13 +76,25 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        .dpad-btn:active {
+            transform: scale(0.9);
+            background: rgba(255,255,255,0.2);
         }
         #up-btn { grid-area: up; }
         #down-btn { grid-area: down; }
         #left-btn { grid-area: left; }
         #right-btn { grid-area: right; }
 
-        @media (hover: none) and (pointer: coarse) {
+        @media (orientation: portrait) {
+            body {
+                justify-content: flex-start;
+                padding-top: 2vh;
+            }
+            #game-container {
+                max-height: 80vh;
+            }
             #mobile-controls-container {
                 display: flex;
             }
@@ -134,6 +146,7 @@
 
         let snake, apple, score, highScore, direction, nextDirection, gameState, gameLoopInterval;
         let countdown = { text: '', alpha: 0, scale: 1 };
+        let gameOverAnim = { titleY: -100, panelY: -100, start: 0 };
         
         const playBtnRect = { x: canvasWidth / 2 - 75, y: canvasHeight / 2 - 25, w: 150, h: 150 };
         const replayBtnRect = { x: canvasWidth / 2 - 75, y: canvasHeight / 2 + 60, w: 150, h: 150 };
@@ -163,7 +176,7 @@
                 score++;
                 if (score > highScore) { highScore = score; localStorage.setItem('snakeHighScore', highScore); }
                 if (score > 0 && score % 5 === 0) {
-                    currentSpeed += 1.5;
+                    currentSpeed = Math.min(20, currentSpeed + 1.5);
                     clearInterval(gameLoopInterval);
                     gameLoopInterval = setInterval(gameLoop, 1000 / currentSpeed);
                 }
@@ -180,15 +193,25 @@
         }
 
         function draw(currentTime) {
+            ctx.save();
+            if (shake.isShaking) {
+                const dx = (Math.random() - 0.5) * shake.magnitude;
+                const dy = (Math.random() - 0.5) * shake.magnitude;
+                ctx.translate(dx, dy);
+            }
+
             drawBackground();
-            if (gameState === 'PLAYING' || gameState === 'GAMEOVER' || gameState === 'COUNTDOWN') {
+            if (gameState === 'PLAYING' || gameState === 'GAMEOVER' || gameState === 'COUNTDOWN' || gameState === 'GAMEOVER_ANIMATING') {
                 drawApple(currentTime);
                 drawSnake();
                 drawUIBar();
             }
             if (gameState === 'MENU') drawHomeScreen(currentTime);
-            else if (gameState === 'GAMEOVER') drawGameOverScreen(currentTime);
+            else if (gameState === 'GAMEOVER_ANIMATING') drawGameOverAnimation(currentTime);
+            else if (gameState === 'GAMEOVER') drawGameOverScreen(currentTime, true);
             else if (gameState === 'COUNTDOWN') drawCountdown();
+            
+            ctx.restore();
         }
         
         function drawBackground() {
@@ -256,9 +279,6 @@
         }
         
         function drawHomeScreen(currentTime) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            
             ctx.font = "90px 'Luckiest Guy'";
             ctx.fillStyle = '#87D37C';
             ctx.textAlign = 'center';
@@ -276,20 +296,25 @@
             ctx.drawImage(assets.images.playBtn, x, y, w, h);
         }
         
-        function drawGameOverScreen(currentTime) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
+        function drawGameOverScreen(currentTime, isFinal) {
+            if(isFinal) {
+                drawGameOverContent(gameOverAnim.titleY, gameOverAnim.panelY, currentTime);
+            } else {
+                drawGameOverContent(gameOverAnim.titleY, gameOverAnim.panelY, currentTime);
+            }
+        }
+        
+        function drawGameOverContent(titleY, panelY, currentTime) {
             ctx.font = "80px 'Luckiest Guy'";
             ctx.fillStyle = '#E74C3C';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 7;
-            ctx.strokeText("GAME OVER", canvasWidth / 2, canvasHeight / 2 - 140);
-            ctx.fillText("GAME OVER", canvasWidth / 2, canvasHeight / 2 - 140);
+            ctx.strokeText("GAME OVER", canvasWidth / 2, titleY);
+            ctx.fillText("GAME OVER", canvasWidth / 2, titleY);
             
-            const panelX = canvasWidth / 2 - 150, panelY = canvasHeight / 2 - 60, panelW = 300, panelH = 110;
+            const panelX = canvasWidth / 2 - 150, panelW = 300, panelH = 110;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
@@ -308,8 +333,31 @@
             const w = replayBtnRect.w * scale;
             const h = replayBtnRect.h * scale;
             const x = replayBtnRect.x - (w - replayBtnRect.w) / 2;
-            const y = replayBtnRect.y - (h - replayBtnRect.h) / 2;
+            const y = (panelY + panelH + 20) + (150-h)/2;
             ctx.drawImage(assets.images.replayBtn, x, y, w, h);
+        }
+        
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+        function drawGameOverAnimation(currentTime) {
+            const duration = 500;
+            if (!gameOverAnim.start) gameOverAnim.start = currentTime;
+            const elapsed = currentTime - gameOverAnim.start;
+            const progress = Math.min(elapsed / duration, 1);
+            const easedProgress = easeOutCubic(progress);
+
+            const titleStartY = -100, titleEndY = canvasHeight / 2 - 140;
+            gameOverAnim.titleY = titleStartY + (titleEndY - titleStartY) * easedProgress;
+
+            const panelStartY = -100, panelEndY = canvasHeight / 2 - 60;
+            gameOverAnim.panelY = panelStartY + (panelEndY - panelStartY) * easedProgress;
+            
+            drawGameOverScreen(currentTime, false);
+
+            if (progress >= 1) {
+                gameState = 'GAMEOVER';
+                replayBtnRect.y = (gameOverAnim.panelY + 110 + 20);
+            }
         }
 
         function drawCountdown() {
@@ -322,13 +370,10 @@
             ctx.textBaseline = 'middle';
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 10;
-
             const x = canvasWidth / 2;
             const y = uiBarHeight + (gameAreaHeight / 2);
-
             ctx.translate(x, y);
             ctx.scale(countdown.scale, countdown.scale);
-            
             ctx.strokeText(countdown.text, 0, 0);
             ctx.fillText(countdown.text, 0, 0);
             ctx.restore();
@@ -350,23 +395,24 @@
             return new Promise(resolve => {
                 let start = performance.now();
                 countdown.text = text;
-
                 function animate(time) {
                     const elapsed = time - start;
                     const duration = 800;
                     const progress = Math.min(elapsed / duration, 1);
-                    
                     countdown.scale = 1 + progress * 0.5;
                     countdown.alpha = 1 - progress;
-
-                    if (progress < 1) {
-                        requestAnimationFrame(animate);
-                    } else {
-                        resolve();
-                    }
+                    if (progress < 1) requestAnimationFrame(animate);
+                    else resolve();
                 }
                 requestAnimationFrame(animate);
             });
+        }
+
+        const shake = { isShaking: false, magnitude: 10, duration: 300, start: 0 };
+        function triggerShake() {
+            shake.isShaking = true;
+            shake.start = performance.now();
+            setTimeout(() => shake.isShaking = false, shake.duration);
         }
 
         function spawnApple() {
@@ -377,11 +423,13 @@
         }
 
         function endGame() {
-            if (gameState === 'GAMEOVER') return;
-            gameState = 'GAMEOVER';
+            if (gameState === 'GAMEOVER' || gameState === 'GAMEOVER_ANIMATING') return;
+            gameState = 'GAMEOVER_ANIMATING';
+            gameOverAnim.start = 0;
             clearInterval(gameLoopInterval);
             assets.sounds.background.pause();
             assets.sounds.gameOver.play();
+            triggerShake();
         }
         
         function setDirection(dir) {
@@ -400,29 +448,43 @@
             else if (key === 'arrowright' || key === 'd') setDirection({ x: 1, y: 0 });
         });
         
-        // D-Pad listeners
-        document.getElementById('up-btn').addEventListener('click', () => setDirection({ x: 0, y: -1 }));
-        document.getElementById('down-btn').addEventListener('click', () => setDirection({ x: 0, y: 1 }));
-        document.getElementById('left-btn').addEventListener('click', () => setDirection({ x: -1, y: 0 }));
-        document.getElementById('right-btn').addEventListener('click', () => setDirection({ x: 1, y: 0 }));
+        ['up-btn', 'down-btn', 'left-btn', 'right-btn'].forEach(id => {
+            const btn = document.getElementById(id);
+            const dir = { 'up-btn': {x:0, y:-1}, 'down-btn': {x:0, y:1}, 'left-btn': {x:-1, y:0}, 'right-btn': {x:1, y:0} }[id];
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); setDirection(dir); }, { passive: false });
+            btn.addEventListener('click', () => setDirection(dir));
+        });
 
-        let touchStartX = 0, touchStartY = 0;
+        let touchStartX = 0, touchStartY = 0, lastSwipeDirection = null;
         window.addEventListener('touchstart', (e) => {
-            if (e.target.closest('#dpad-container')) return; // Ignore if touch starts on D-pad
-            if (gameState === 'PLAYING') { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }
-        }, { passive: true });
+            if (e.target.closest('#mobile-controls-container')) return;
+            if (gameState === 'PLAYING') { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; lastSwipeDirection = null; }
+        }, { passive: false });
 
         window.addEventListener('touchmove', (e) => {
-            if (gameState !== 'PLAYING' || !touchStartX || !touchStartY || e.target.closest('#dpad-container')) return;
+            if (gameState !== 'PLAYING' || e.target.closest('#mobile-controls-container')) return;
             const dx = e.touches[0].clientX - touchStartX;
             const dy = e.touches[0].clientY - touchStartY;
-
-            if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-                if (Math.abs(dx) > Math.abs(dy)) setDirection({ x: dx > 0 ? 1 : -1, y: 0 });
-                else setDirection({ x: 0, y: dy > 0 ? 1 : -1 });
-                touchStartX = 0; touchStartY = 0;
+            const threshold = 30;
+            let currentDirection;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > threshold) {
+                    currentDirection = dx > 0 ? 'right' : 'left';
+                    if (lastSwipeDirection !== currentDirection) {
+                        setDirection({ x: dx > 0 ? 1 : -1, y: 0 });
+                        lastSwipeDirection = currentDirection;
+                    }
+                }
+            } else {
+                 if (Math.abs(dy) > threshold) {
+                    currentDirection = dy > 0 ? 'down' : 'up';
+                     if (lastSwipeDirection !== currentDirection) {
+                        setDirection({ x: 0, y: dy > 0 ? 1 : -1 });
+                        lastSwipeDirection = currentDirection;
+                    }
+                }
             }
-        }, { passive: true });
+        }, { passive: false });
 
         canvas.addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
