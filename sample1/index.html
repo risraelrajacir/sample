@@ -37,32 +37,14 @@
             box-shadow: 0 0 25px rgba(255, 255, 255, 0.15);
         }
 
-        #roadCanvas {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            filter: saturate(130%) brightness(110%) contrast(120%);
-        }
-
-        #gameObjectContainer {
+        /* ⭐⭐ CHANGE: Canvas is now the ONLY rendering surface */
+        #gameCanvas {
             width: 100%;
             height: 100%;
             position: absolute;
             top: 0;
             left: 0;
         }
-        
-        .gameObject {
-            position: absolute;
-            will-change: transform;
-            filter: drop-shadow(3px 3px 3px rgba(0,0,0,0.4));
-        }
-
-        #playerCar { z-index: 4; }
-        .obstacle { z-index: 3; }
-        .coin { z-index: 2; }
         
         .ui-screen {
             position: absolute;
@@ -172,7 +154,6 @@
             display: none;
         }
         
-        /* ⭐⭐ CHANGE: Controls moved up to be fully visible */
         #controlContainer {
             position: absolute;
             left: 0;
@@ -222,8 +203,7 @@
 <body>
     <div id="gameWrapper">
         <div id="gameContainer">
-            <canvas id="roadCanvas"></canvas>
-            <div id="gameObjectContainer"></div>
+            <canvas id="gameCanvas"></canvas>
             <div id="menuScreen" class="ui-screen">
                 <h1>RACING GAME</h1>
                 <img src="https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/py_ne_ui_bn.png?raw=true" id="startButton" class="ui-button" alt="Play Game">
@@ -260,9 +240,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const gameContainer = document.getElementById('gameContainer');
-            const canvas = document.getElementById('roadCanvas');
+            const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
-            const gameObjectContainer = document.getElementById('gameObjectContainer');
+            
             const scoreBox = document.getElementById('scoreBox');
             const menuScreen = document.getElementById('menuScreen');
             const gameOverScreen = document.getElementById('gameOverScreen');
@@ -287,11 +267,10 @@
             let score = 0;
             let highScore = 0;
             let roadY = 0;
-            let roadSpeed = 350; // Speed in pixels per second
+            let roadSpeed = 350;
             let playerCar = {};
             let obstacles = [];
             let coins = [];
-            let roadImage;
             let lastUsedObstacleIndex = -1;
             
             let moveDirection = null;
@@ -299,22 +278,20 @@
             let laneSwitchCooldown = 150;
             let lastSwitchTime = 0;
             
-            // ⭐⭐ CHANGE: Delta-time variables for smooth animation
             let lastTimestamp = 0;
+
+            const assets = {};
             
-            const roadImgSrc = 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_rs/rg_ge_1_as_rs_1/rd_1.png?raw=true';
-            const playerCarImgSrc = 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_pr_cs/rg_ge_1_as_pr_cs_1/pr_cr_1.png?raw=true';
-            const coinImgSrc = 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_cs/rg_ge_1_as_cs_1/cn_ce.gif?raw=true';
-            const obstacleSources = [
-                'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/wecr_oe.png?raw=true',
-                'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/oecr_oe.png?raw=true',
-                'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/gncr_oe.png?raw=true',
-                'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/rdcr_oe.png?raw=true',
-            ];
-            const uiImageSources = [
-                'https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/py_ne_ui_bn.png?raw=true',
-                'https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/ry_ne_ui_bn.png?raw=true'
-            ];
+            const assetUrls = {
+                road: 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_rs/rg_ge_1_as_rs_1/rd_1.png?raw=true',
+                playerCar: 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_pr_cs/rg_ge_1_as_pr_cs_1/pr_cr_1.png?raw=true',
+                coin: 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_cs/rg_ge_1_as_cs_1/cn_ce.gif?raw=true',
+                obstacle1: 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/wecr_oe.png?raw=true',
+                obstacle2: 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/oecr_oe.png?raw=true',
+                obstacle3: 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/gncr_oe.png?raw=true',
+                obstacle4: 'https://github.com/Rajacajustin/gs_1/blob/main/rg_ge_1/rg_ge_1_as/rg_ge_1_as_os/rg_ge_1_as_os_1/rdcr_oe.png?raw=true'
+            };
+            const obstacleKeys = ['obstacle1', 'obstacle2', 'obstacle3', 'obstacle4'];
             
             let leftBoundary, rightBoundary;
             let lanePositions = [];
@@ -325,22 +302,22 @@
                 
                 resizeGame();
                 await preloadAssets();
-                roadImage = new Image();
-                roadImage.src = roadImgSrc;
-                roadImage.onload = () => {
-                    setupEventListeners();
-                    requestAnimationFrame(gameLoop);
-                };
+                setupEventListeners();
+                requestAnimationFrame(gameLoop);
             }
 
             function preloadAssets() {
-                const imageUrls = [roadImgSrc, playerCarImgSrc, coinImgSrc, ...obstacleSources, ...uiImageSources];
-                const promises = imageUrls.map(url => new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.src = url;
-                    img.onload = () => resolve(img);
-                    img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-                }));
+                const promises = Object.entries(assetUrls).map(([key, url]) => {
+                    return new Promise((resolve, reject) => {
+                        const img = new Image();
+                        img.src = url;
+                        img.onload = () => {
+                            assets[key] = img;
+                            resolve();
+                        };
+                        img.onerror = () => reject(new Error(`Failed to load image: ${key}`));
+                    });
+                });
                 return Promise.all(promises);
             }
 
@@ -410,7 +387,6 @@
                 score = 0;
                 roadSpeed = 350;
                 updateScoreDisplay();
-                gameObjectContainer.innerHTML = '';
                 obstacles = [];
                 coins = [];
                 createPlayerCar();
@@ -482,32 +458,18 @@
                 scoreBox.style.display = 'none';
             }
 
-            function createGameObject(props) {
-                const elem = document.createElement('img');
-                elem.src = props.src;
-                elem.className = `gameObject ${props.className || ''}`;
-                elem.style.width = `${props.width}px`;
-                elem.style.height = `auto`;
-                gameObjectContainer.appendChild(elem);
-                return { ...props, lane: props.lane, elem };
-            }
-
             function createPlayerCar() {
-                const carWidth = gameContainer.clientWidth * 0.09; 
+                const carWidth = gameContainer.clientWidth * 0.08; 
                 const carHeight = carWidth * 1.8; 
-                playerCar = createGameObject({
-                    src: playerCarImgSrc, 
-                    className: 'player', 
-                    width: carWidth, 
+                playerCar = {
+                    img: assets.playerCar,
+                    width: carWidth,
                     height: carHeight,
-                    x: 0, 
-                    y: gameContainer.clientHeight - carHeight - 140, // Player car moved up
-                    lane: 1
-                });
-                playerCar.lane = Math.random() < 0.5 ? 1 : 2;
+                    x: 0,
+                    y: gameContainer.clientHeight - carHeight - 140,
+                    lane: Math.random() < 0.5 ? 1 : 2
+                };
                 playerCar.x = lanePositions[playerCar.lane] - (carWidth / 2);
-                playerCar.elem.id = 'playerCar';
-                playerCar.elem.style.transform = `translate(${playerCar.x}px, ${playerCar.y}px)`;
             }
             
             let lastSpawnTime = 0;
@@ -527,7 +489,7 @@
             }
 
             function spawnTrafficWave() {
-                const carWidth = gameContainer.clientWidth * 0.09;
+                const carWidth = gameContainer.clientWidth * 0.08;
                 let availableLanes = [0, 1, 2, 3];
                 
                 for (const obs of obstacles) {
@@ -542,59 +504,60 @@
 
                 for (let i = 0; i < numCarsToSpawn && availableLanes.length > 0; i++) {
                     const laneIndex = availableLanes.pop();
-                    const spawnX = lanePositions[laneIndex] - (carWidth / 2);
-                    spawnObstacle(spawnX, carWidth, laneIndex);
+                    spawnObstacle(carWidth, laneIndex);
                 }
             }
             
-            function spawnObstacle(spawnX, carWidth, laneIndex) {
+            function spawnObstacle(carWidth, laneIndex) {
                 const carHeight = carWidth * 1.8;
-                let obstacleIndex = Math.floor(Math.random() * obstacleSources.length);
-                if (obstacleIndex === lastUsedObstacleIndex) {
-                    obstacleIndex = (obstacleIndex + 1) % obstacleSources.length;
+                let obstacleKey = obstacleKeys[Math.floor(Math.random() * obstacleKeys.length)];
+                if (obstacleKey === lastUsedObstacleIndex) {
+                    obstacleKey = obstacleKeys[(obstacleKeys.indexOf(obstacleKey) + 1) % obstacleKeys.length];
                 }
-                lastUsedObstacleIndex = obstacleIndex;
+                lastUsedObstacleIndex = obstacleKey;
                 
-                obstacles.push(createGameObject({
-                    src: obstacleSources[obstacleIndex],
-                    className: 'obstacle', 
+                obstacles.push({
+                    img: assets[obstacleKey],
                     width: carWidth, 
                     height: carHeight, 
-                    x: spawnX, 
+                    x: lanePositions[laneIndex] - (carWidth / 2), 
                     y: -carHeight * 2,
-                    speed: roadSpeed * 0.4 + Math.random() * 100, // Speed in pixels per second
+                    speed: roadSpeed * 0.4 + Math.random() * 100,
                     lane: laneIndex
-                }));
+                });
             }
             
             function spawnCoin() {
-                const coinSize = gameContainer.clientWidth * 0.07;
-                const spawnX = Math.random() * (rightBoundary - leftBoundary - coinSize) + leftBoundary;
-                coins.push(createGameObject({ 
-                    src: coinImgSrc, 
-                    className: 'coin', 
+                const coinSize = gameContainer.clientWidth * 0.08;
+                const laneIndex = Math.floor(Math.random() * 4);
+                coins.push({ 
+                    img: assets.coin,
                     width: coinSize, 
                     height: coinSize, 
-                    x: spawnX, 
+                    x: lanePositions[laneIndex] - (coinSize / 2),
                     y: -coinSize, 
                     speed: roadSpeed * 0.9
-                }));
+                });
             }
             
             function gameLoop(timestamp) {
                 if (!lastTimestamp) lastTimestamp = timestamp;
-                const deltaTime = (timestamp - lastTimestamp) / 1000; // Time in seconds
+                const deltaTime = (timestamp - lastTimestamp) / 1000;
                 lastTimestamp = timestamp;
 
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
                 drawRoad(deltaTime);
+                
                 if (gameState === 'playing' || gameState === 'countdown') {
                     movePlayer();
+                    drawGameObjects();
                 }
+                
                 if (gameState === 'playing') {
                     updateGameObjects(deltaTime);
                     checkCollisions();
                     manageSpawns(Date.now());
-                    roadSpeed += 20 * deltaTime; // Increase speed over time
+                    roadSpeed += 20 * deltaTime;
                     score += roadSpeed / 100 * deltaTime;
                     updateScoreDisplay();
                 }
@@ -602,23 +565,33 @@
             }
 
             function drawRoad(deltaTime) {
-                if (!roadImage) return;
+                if (!assets.road) return;
                 
                 let currentSpeed = 0;
                 if (gameState === 'playing' || gameState === 'countdown') {
                     currentSpeed = roadSpeed;
                 } else if (gameState === 'menu') {
-                    currentSpeed = 120; // Pixels per second
+                    currentSpeed = 120;
                 }
                 
                 roadY = (roadY + currentSpeed * deltaTime) % canvas.height;
                 
-                ctx.drawImage(roadImage, 0, roadY, canvas.width, canvas.height);
-                ctx.drawImage(roadImage, 0, roadY - canvas.height, canvas.width, canvas.height);
+                ctx.drawImage(assets.road, 0, roadY, canvas.width, canvas.height);
+                ctx.drawImage(assets.road, 0, roadY - canvas.height, canvas.width, canvas.height);
+            }
+
+            function drawGameObjects() {
+                for (const coin of coins) {
+                    ctx.drawImage(coin.img, coin.x, coin.y, coin.width, coin.height);
+                }
+                for (const obs of obstacles) {
+                    ctx.drawImage(obs.img, obs.x, obs.y, obs.width, obs.height);
+                }
+                ctx.drawImage(playerCar.img, playerCar.x, playerCar.y, playerCar.width, playerCar.height);
             }
 
             function movePlayer() {
-                if (!playerCar.elem) return;
+                if (!playerCar) return;
                 if (moveDirection && !isSwitchingLanes) {
                     switchLane(moveDirection);
                 }
@@ -631,42 +604,33 @@
                     playerCar.x = targetX;
                     isSwitchingLanes = false;
                 }
-                
-                playerCar.elem.style.transform = `translate(${playerCar.x}px, ${playerCar.y}px)`;
             }
             
             function updateGameObjects(deltaTime) {
                 const updateObject = (obj) => {
                     obj.y += obj.speed * deltaTime; 
-                    if (obj.y > gameContainer.clientHeight) {
-                        obj.elem.remove();
-                        return false;
-                    }
-                    obj.elem.style.transform = `translate(${obj.x}px, ${obj.y}px)`;
-                    return true;
+                    return obj.y < gameContainer.clientHeight;
                 };
                 obstacles = obstacles.filter(updateObject);
                 coins = coins.filter(updateObject);
             }
             
             function checkCollisions() {
-                if (!playerCar.elem) return;
-                const playerRect = playerCar.elem.getBoundingClientRect();
+                if (!playerCar) return;
 
                 for (const obs of obstacles) {
-                    if (isColliding(playerRect, obs.elem.getBoundingClientRect())) { 
+                    if (isColliding(playerCar, obs)) { 
                         triggerGameOver(); 
                         return; 
                     }
                 }
                 for (let i = coins.length - 1; i >= 0; i--) {
                     const coin = coins[i];
-                    if (isColliding(playerRect, coin.elem.getBoundingClientRect())) {
+                    if (isColliding(playerCar, coin)) {
                         score += 5;
                         soundCollect.volume = 0.5;
                         soundCollect.currentTime = 0; 
                         soundCollect.play();
-                        coin.elem.remove(); 
                         coins.splice(i, 1);
                     }
                 }
@@ -676,10 +640,10 @@
                 const horizontalBuffer = rect1.width * 0.2;
                 const verticalBuffer = rect1.height * 0.1;
 
-                return !(rect1.right - horizontalBuffer < rect2.left + horizontalBuffer || 
-                         rect1.left + horizontalBuffer > rect2.right - horizontalBuffer || 
-                         rect1.bottom - verticalBuffer < rect2.top + verticalBuffer || 
-                         rect1.top + verticalBuffer > rect2.bottom - verticalBuffer);
+                return !(rect1.x + rect1.width - horizontalBuffer < rect2.x + horizontalBuffer || 
+                         rect1.x + horizontalBuffer > rect2.x + rect2.width - horizontalBuffer || 
+                         rect1.y + rect1.height - verticalBuffer < rect2.y + verticalBuffer || 
+                         rect1.y + verticalBuffer > rect2.y + rect2.height - verticalBuffer);
             }
             
             function updateScoreDisplay() { 
@@ -703,7 +667,6 @@
                 const roadWidth = rightBoundary - leftBoundary;
                 const laneWidth = roadWidth / 4;
 
-                // Center of each of the 4 lanes
                 lanePositions = [
                     leftBoundary + laneWidth * 0.5,
                     leftBoundary + laneWidth * 1.5,
@@ -711,12 +674,12 @@
                     leftBoundary + laneWidth * 3.5,
                 ];
 
-                if (playerCar.elem) {
-                    const carWidth = gameWidth * 0.09;
+                if (playerCar.img) {
+                    const carWidth = gameWidth * 0.08;
                     playerCar.width = carWidth;
-                    playerCar.elem.style.width = `${carWidth}px`;
+                    playerCar.height = carWidth * 1.8;
                     playerCar.x = lanePositions[playerCar.lane] - (carWidth / 2);
-                    playerCar.y = gameHeight - (carWidth * 1.8) - 140; // Player car moved up
+                    playerCar.y = gameHeight - playerCar.height - 140;
                 }
             }
             
