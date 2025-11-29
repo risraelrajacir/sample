@@ -3,590 +3,386 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dino Run - Fun & Balanced</title>
+    <title>Flappy Bird</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
-
-        body {
+        /* CSS to ensure full screen, no scroll, and centered content */
+        html, body {
             margin: 0;
             padding: 0;
-            background-color: #202020;
+            overflow: hidden; /* Absolutely no scrollbars */
+            width: 100%;
+            height: 100%;
+            background-color: #333;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            font-family: 'Fredoka One', cursive;
-            overflow: hidden;
-            touch-action: none;
         }
-
-        #game-wrapper {
-            position: relative;
-            width: 100%;
-            max-width: 800px;
-            aspect-ratio: 16/9;
-            box-shadow: 0 10px 50px rgba(0,0,0,0.8);
-            border: 3px solid #444;
-            background-color: #4AC;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
         canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        #loader {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: #fff;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 50;
-            transition: opacity 0.4s;
-        }
-
-        h1 { margin: 0 0 15px 0; color: #333; font-size: 2.5rem; letter-spacing: 2px; }
-
-        #progress-bar {
-            width: 60%;
-            height: 15px;
-            background: #eee;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        #progress-fill {
-            height: 100%;
-            width: 0%;
-            background: #ff8800;
-            transition: width 0.1s linear;
-        }
-
-        #mobile-controls {
-            position: absolute;
-            bottom: 20px;
-            width: 100%;
-            display: none; /* Enabled via JS */
-            pointer-events: none;
-            justify-content: space-between;
-            padding: 0 40px;
-            box-sizing: border-box;
-            z-index: 20;
-        }
-
-        .control-arrow {
-            width: 80px;
-            height: 80px;
-            background: rgba(255,255,255,0.25);
-            border: 2px solid rgba(255,255,255,0.6);
-            border-radius: 50%;
-            pointer-events: auto;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 40px;
-            color: white;
-            backdrop-filter: blur(4px);
+            border: 2px solid #000;
+            background-color: #70c5ce;
+            cursor: pointer;
+            /* Let JS handle the exact size */
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            /* Disables unwanted mobile behaviors */
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
             user-select: none;
-        }
-        .control-arrow:active {
-            background: rgba(255,255,255,0.5);
-            transform: scale(0.95);
+            -webkit-user-select: none;
         }
     </style>
 </head>
 <body>
-
-<div id="game-wrapper">
-    <div id="loader">
-        <h1>DINO RUN</h1>
-        <div id="progress-bar"><div id="progress-fill"></div></div>
-    </div>
-    
-    <div id="mobile-controls">
-        <div class="control-arrow" id="btn-duck">⬇️</div>
-        <div class="control-arrow" id="btn-jump">⬆️</div>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="288" height="512"></canvas>
     </div>
 
-    <canvas id="gameCanvas" width="800" height="450"></canvas>
-</div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
 
-<script>
-/**
- * DINO RUN - BALANCED & ADDICTIVE EDITION
- * 
- * 1. Gameplay: Speed starts at 7.0 (Fair). Ramps up smoothly.
- * 2. Smart Spawning: Calculates gaps based on speed so jumps are always possible.
- * 3. Patterns: Groups of 1, 2, or 3 cacti appear based on Score/Difficulty.
- * 4. Visuals: 150px Pulsing Buttons, Perfect Ground Alignment.
- */
-
-const ASSETS_SRC = {
-    bg: "https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_bgs/dr_ge_1_as_bgs_1/bg_2.png?raw=true",
-    ground: "https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_gs/dr_ge_1_as_gs_1/gd_1.png?raw=true",
-    cactus: "https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_os/dr_ge_1_as_os_1/cs_1.png?raw=true",
-    btnPlay: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/py_ne_ui_bn.png?raw=true",
-    btnReplay: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/ry_ne_ui_bn.png?raw=true",
-    
-    idle: Array.from({length:10}, (_,i)=> `https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_dr/dr_ge_1_as_dr_1/dr_le_${i+1}.png?raw=true`),
-    run: Array.from({length:8}, (_,i)=> `https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_dr/dr_ge_1_as_dr_1/dr_rn_${i+1}.png?raw=true`),
-    jump: Array.from({length:12}, (_,i)=> `https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_dr/dr_ge_1_as_dr_1/dr_jp_${i+1}.png?raw=true`),
-    dead: Array.from({length:8}, (_,i)=> `https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_dr/dr_ge_1_as_dr_1/dr_dd_${i+1}.png?raw=true`),
-    bird: Array.from({length:4}, (_,i)=> `https://github.com/Rajacajustin/gs_1/blob/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_os/dr_ge_1_as_os_1/dr_ge_1_as_os_1_bds_1/be_bd_${i+1}.png?raw=true`),
-    
-    sndJump: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_sd_es/dr_ge_1_as_sd_es_1/jp_sd_et.mp3",
-    sndDuck: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/dr_ge_1/dr_ge_1_as/dr_ge_1_as_sd_es/dr_ge_1_as_sd_es_1/wh_sd_et.mp3",
-    sndDie: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/se_ge_1/se_ge_1_as/se_ge_1_as_sd_es/se_ge_1_as_sd_es_1/ge_or_sd_et_.mp3"
-};
-
-const CONFIG = {
-    startSpeed: 7.0,    // Balanced Start
-    maxSpeed: 18.0,     // Cap to prevent breaking physics
-    gravity: 0.65,
-    jumpForce: -13.5,
-    groundH: 80,
-    dinoSize: 85,
-    duckDuration: 45
-};
-
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const loader = document.getElementById('loader');
-const progress = document.getElementById('progress-fill');
-
-let assets = {};
-let sounds = {};
-let gameState = "INIT"; 
-let score = 0;
-let highScore = localStorage.getItem('dino_score_balanced') || 0;
-let speed = CONFIG.startSpeed;
-let frames = 0;
-
-let dino = { x: 50, y: 0, vy: 0, state: "IDLE", frame: 0 };
-let obstacles = [];
-let groundOffset = 0;
-let input = { up: false, down: false };
-let duckTimer = 0;
-let inputLockDuck = false;
-
-let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-let ui = { flashOp: 0, textY: -100, boardY: 600, targetBoardY: 150, pulse: 1 };
-
-if(isMobile) {
-    document.getElementById('mobile-controls').style.display = 'flex';
-    const bJ = document.getElementById('btn-jump');
-    const bD = document.getElementById('btn-duck');
-    
-    bJ.addEventListener('touchstart', e => { e.preventDefault(); if(gameState === "PLAY") input.up = true; else checkClick(); });
-    bJ.addEventListener('touchend', e => { e.preventDefault(); input.up = false; });
-    
-    bD.addEventListener('touchstart', e => { e.preventDefault(); input.down = true; });
-    bD.addEventListener('touchend', e => { e.preventDefault(); input.down = false; });
-}
-
-async function init() {
-    let toLoad = [];
-    const add = (k, s) => toLoad.push({k, s});
-    
-    add('bg', ASSETS_SRC.bg); add('ground', ASSETS_SRC.ground);
-    add('cactus', ASSETS_SRC.cactus); add('btnPlay', ASSETS_SRC.btnPlay);
-    add('btnReplay', ASSETS_SRC.btnReplay);
-    
-    ASSETS_SRC.idle.forEach((s, i)=> add(`idle_${i}`, s));
-    ASSETS_SRC.run.forEach((s, i)=> add(`run_${i}`, s));
-    ASSETS_SRC.jump.forEach((s, i)=> add(`jump_${i}`, s));
-    ASSETS_SRC.dead.forEach((s, i)=> add(`dead_${i}`, s));
-    ASSETS_SRC.bird.forEach((s, i)=> add(`bird_${i}`, s));
-
-    let loaded = 0;
-    const promise = (item) => new Promise(res => {
-        const img = new Image();
-        img.src = item.s;
-        img.onload = () => {
-            loaded++;
-            progress.style.width = (loaded/toLoad.length * 100) + "%";
-            res({k:item.k, img});
-        };
-        img.onerror = () => res({k:item.k, img:null});
-    });
-
-    const results = await Promise.all(toLoad.map(promise));
-    
-    assets.idle=[]; assets.run=[]; assets.jump=[]; assets.dead=[]; assets.bird=[];
-    results.forEach(({k, img}) => {
-        if(k.includes('_')) { const [t, i] = k.split('_'); assets[t][parseInt(i)] = img; }
-        else assets[k] = img;
-    });
-
-    sounds.jump = new Audio(ASSETS_SRC.sndJump);
-    sounds.duck = new Audio(ASSETS_SRC.sndDuck);
-    sounds.die = new Audio(ASSETS_SRC.sndDie);
-
-    setTimeout(() => {
-        loader.style.opacity = 0;
-        setTimeout(() => loader.remove(), 500);
-        goHome();
-        loop();
-    }, 500);
-}
-
-function goHome() {
-    gameState = "HOME";
-    resetGame();
-    ui.flashOp = 0; ui.textY = -100; ui.boardY = canvas.height + 200;
-}
-
-function startGame() {
-    gameState = "PLAY";
-    resetGame();
-    sounds.jump.play().catch(()=>{});
-}
-
-function resetGame() {
-    // Dino: +10px into ground (Sunken)
-    dino.y = canvas.height - CONFIG.groundH - CONFIG.dinoSize + 10; 
-    dino.vy = 0;
-    dino.state = "RUN"; 
-    obstacles = [];
-    score = 0;
-    speed = CONFIG.startSpeed;
-    frames = 0;
-    groundOffset = 0;
-    duckTimer = 0;
-    inputLockDuck = false;
-}
-
-function update() {
-    // Pulse for buttons
-    ui.pulse = 1 + Math.sin(frames * 0.1) * 0.05;
-
-    if (gameState === "HOME") {
-        frames++;
-        dino.state = "IDLE";
-    } 
-    else if (gameState === "PLAY") {
-        frames++;
-        score++;
-        // Smooth Acceleration
-        if(speed < CONFIG.maxSpeed) speed += 0.0015;
-        
-        groundOffset = (groundOffset + speed) % assets.ground.width;
-        
-        const groundTop = canvas.height - CONFIG.groundH;
-        const floor = groundTop - CONFIG.dinoSize + 10;
-
-        dino.y += dino.vy;
-
-        if (dino.y >= floor) {
-            dino.y = floor;
-            dino.vy = 0;
-
-            // Auto-Release Duck Logic
-            if (duckTimer > 0) {
-                dino.state = "DUCK";
-                duckTimer--;
-                if(duckTimer <= 0) dino.state = "RUN";
-            } else {
-                dino.state = "RUN";
-            }
-
-            if (input.up) {
-                dino.vy = CONFIG.jumpForce;
-                dino.state = "JUMP";
-                duckTimer = 0;
-                sounds.jump.currentTime = 0;
-                sounds.jump.play().catch(()=>{});
-                input.up = false;
-            } 
-            else if (input.down) {
-                if (!inputLockDuck && duckTimer <= 0) {
-                    duckTimer = CONFIG.duckDuration;
-                    dino.state = "DUCK";
-                    sounds.duck.currentTime = 0;
-                    sounds.duck.play().catch(()=>{});
-                    inputLockDuck = true;
-                }
-            } else {
-                inputLockDuck = false;
-            }
-
-        } else {
-            dino.vy += CONFIG.gravity;
-            dino.state = "JUMP";
-            if(input.down) dino.vy += 1.5;
-        }
-
-        manageObstacles();
-    }
-    else if (gameState === "DYING") {
-        frames++;
-        const floor = canvas.height - CONFIG.groundH - CONFIG.dinoSize + 10;
-        
-        if (dino.y < floor) dino.y += CONFIG.gravity * 2;
-        else dino.y = floor;
-
-        if (dino.frame < assets.dead.length - 1) {
-            if (frames % 4 === 0) dino.frame++;
-        } else {
-            gameState = "GAMEOVER";
-            if (score > highScore) {
-                highScore = score;
-                localStorage.setItem('dino_score_balanced', highScore);
-            }
-        }
-    }
-    else if (gameState === "GAMEOVER") {
-        const floor = canvas.height - CONFIG.groundH - CONFIG.dinoSize + 10;
-        if (dino.y < floor) dino.y += CONFIG.gravity * 2;
-        else dino.y = floor;
-
-        if(ui.flashOp > 0) ui.flashOp -= 0.03;
-        if(ui.textY < 80) ui.textY += (80 - ui.textY) * 0.1;
-        if(ui.boardY > ui.targetBoardY) ui.boardY += (ui.targetBoardY - ui.boardY) * 0.1;
-    }
-}
-
-function manageObstacles() {
-    // SMART SPAWNING LOGIC
-    // Determine safe gap based on current speed
-    // Higher speed = Need more room to react/jump
-    let safeGap = 350 + (speed * 15); 
-    
-    if (obstacles.length === 0 || canvas.width - obstacles[obstacles.length-1].x > safeGap) {
-        // Random Chance to spawn
-        if(Math.random() > 0.1) {
+        // --- Responsive Canvas Scaling ---
+        function resizeGame() {
+            const gameRatio = canvas.width / canvas.height;
+            const containerRatio = gameContainer.clientWidth / gameContainer.clientHeight;
             
-            // Choose Type
-            let type = Math.random() > 0.65 ? "BIRD" : "CACTUS";
-            let clusterSize = 1;
-
-            if (type === "CACTUS") {
-                // Difficulty Progression for Clusters
-                if (score > 800 && Math.random() > 0.6) clusterSize = 2; // Double
-                if (score > 2000 && Math.random() > 0.8) clusterSize = 3; // Triple (Rare)
+            if (containerRatio < gameRatio) {
+                canvas.style.width = gameContainer.clientWidth + 'px';
+                canvas.style.height = (gameContainer.clientWidth / gameRatio) + 'px';
+            } else {
+                canvas.style.height = gameContainer.clientHeight + 'px';
+                canvas.style.width = (gameContainer.clientHeight * gameRatio) + 'px';
             }
+        }
+        window.addEventListener('resize', resizeGame);
+        window.addEventListener('orientationchange', resizeGame);
+        resizeGame();
 
-            const groundTop = canvas.height - CONFIG.groundH;
+        // --- Asset URLs ---
+        const assets = {
+            bird: [
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_1.png?raw=true",
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_2.png?raw=true",
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_3.png?raw=true",
+                "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bs/bd_ge_1_as_bs_1/be_bd_4.png?raw=true"
+            ],
+            background: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bgs/bd_ge_1_as_bgs_1/bg_dy_1.png?raw=true",
+            base: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_bes/bd_ge_1_as_bes_1/gd_1.png?raw=true",
+            pipeTop: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_ps/bd_ge_1_as_ps_1/gn_pe_tp.png?raw=true",
+            pipeBottom: "https://github.com/Rajacajustin/gs_1/blob/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_ps/bd_ge_1_as_ps_1/gn_pe_bm.png?raw=true",
+            uiBackground: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/UIbg.png?raw=true",
+            getReady: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tt_Gt_Ry_ui.png?raw=true",
+            gameOver: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tt_Ge_Or_ui.png?raw=true",
+            playButton: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/py_ne_ui_bn.png?raw=true",
+            replayButton: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/as_ui_1_ui_bs_1/ry_ne_ui_bn.png?raw=true",
+            tapSymbol: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tp_sl_ui.png?raw=true",
+            tapTickSymbol: "https://github.com/Rajacajustin/gs_1/blob/main/as/as_ui/as_ui_1/tp_Tk_ui.png?raw=true",
+            swoosh: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/sh_sd_et.mp3",
+            flap: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/fp_sd_et.mp3",
+            point: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/pt_sd_et.mp3",
+            hit: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/ht_sd_et.mp3",
+            die: "https://github.com/Rajacajustin/gs_1/raw/refs/heads/main/bd_ge_1/bd_ge_1_as/bd_ge_1_as_sd_es/bd_ge_1_as_sd_es_1/de_sd_et.mp3"
+        };
 
-            // Spawn Cluster
-            for(let i=0; i<clusterSize; i++) {
-                let obs = { type, x: canvas.width + (i * 50), w:0, h:0, frame:0 };
-                
-                if (type === "CACTUS") {
-                    obs.w = 50; obs.h = 60;
-                    // Cactus: Exact Top of Ground (+0 offset)
-                    obs.y = groundTop - obs.h; 
-                } else {
-                    obs.w = 50; obs.h = 40;
-                    let isHigh = Math.random() > 0.5;
-                    // Bird Logic
-                    if(isHigh) obs.y = groundTop - 85; 
-                    else obs.y = groundTop - 50;
+        const images = {};
+        const sounds = {};
+        let assetsToLoad = 0;
+
+        function assetLoaded() {
+            assetsToLoad--;
+            if (assetsToLoad === 0) {
+                main();
+            }
+        }
+
+        function loadAssets() {
+            ctx.fillStyle = "black"; ctx.font = "20px Arial"; ctx.textAlign = "center";
+            ctx.fillText("Loading...", canvas.width/2, canvas.height/2);
+            
+            const imageKeys = ['background', 'base', 'pipeTop', 'pipeBottom', 'uiBackground', 'getReady', 'gameOver', 'playButton', 'replayButton', 'tapSymbol', 'tapTickSymbol'];
+            const soundKeys = ['swoosh', 'flap', 'point', 'hit', 'die'];
+            assetsToLoad = imageKeys.length + assets.bird.length + soundKeys.length;
+            
+            imageKeys.forEach(key => { images[key] = new Image(); images[key].src = assets[key]; images[key].onload = assetLoaded; });
+            images.bird = assets.bird.map(src => { const img = new Image(); img.src = src; img.onload = assetLoaded; return img; });
+            soundKeys.forEach(key => {
+                sounds[key] = new Audio(assets[key]);
+                sounds[key].addEventListener('canplaythrough', assetLoaded, { once: true });
+            });
+        }
+        
+        // --- NEW SOUND SYSTEM ---
+        function playSound(soundKey) {
+            const sound = sounds[soundKey];
+            if (sound) {
+                sound.currentTime = 0; // Rewind to start
+                sound.play().catch(e => console.error(`Could not play sound: ${soundKey}`, e));
+            }
+        }
+        
+        function main() {
+            let frames = 0;
+            const DEGREE = Math.PI / 180;
+            const state = { current: 0, getReady: 0, instructions: 1, game: 2, over: 3 };
+
+            const flash = {
+                alpha: 0, speed: 0.1,
+                start: function() { this.alpha = 0.7; },
+                update: function() { this.alpha = Math.max(0, this.alpha - this.speed); },
+                draw: function() {
+                    if (this.alpha > 0) {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                },
+                reset: function() { this.alpha = 0; }
+            };
+
+            const transition = {
+                alpha: 0, speed: 0.05, active: false, targetState: -1,
+                start: function(target) {
+                    if (this.active) return;
+                    this.active = true; this.isFadingOut = true; this.targetState = target; playSound('swoosh');
+                },
+                update: function() {
+                    if (!this.active) return;
+                    if (this.isFadingOut) {
+                        this.alpha = Math.min(1, this.alpha + this.speed);
+                        if (this.alpha >= 1) {
+                            this.isFadingOut = false; this.isFadingIn = true;
+                            if (state.current === state.over) resetGame();
+                            state.current = this.targetState;
+                        }
+                    } else if (this.isFadingIn) {
+                        this.alpha = Math.max(0, this.alpha - this.speed);
+                        if (this.alpha <= 0) { this.isFadingIn = false; this.active = false; }
+                    }
+                },
+                draw: function() {
+                    if (this.alpha > 0) {
+                        ctx.fillStyle = `rgba(0, 0, 0, ${this.alpha})`;
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
                 }
-                obstacles.push(obs);
+            };
+
+            const bg = { draw: () => ctx.drawImage(images.background, 0, 0, canvas.width, canvas.height) };
+            
+            const base = {
+                x: 0, y: canvas.height - 112, w: 336, h: 112, dx: 2,
+                draw: function() {
+                    ctx.drawImage(images.base, this.x, this.y, this.w, this.h);
+                    ctx.drawImage(images.base, this.x + this.w, this.y, this.w, this.h);
+                },
+                update: function() {
+                    if (state.current !== state.over) {
+                        this.x -= this.dx;
+                        if (this.x <= -this.w) this.x = 0;
+                    }
+                }
+            };
+
+            const bird = {
+                x: 80, y: 190, w: 34, h: 24, frame: 0,
+                gravity: 0.20, jump: 4.2, speed: 0, rotation: 0,
+                draw: function() {
+                    let birdImg = images.bird[this.frame];
+                    ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation);
+                    ctx.drawImage(birdImg, -this.w / 2, -this.h / 2, this.w, this.h);
+                    ctx.restore();
+                },
+                flap: function() { this.speed = -this.jump; },
+                update: function() {
+                    if (state.current === state.getReady || state.current === state.instructions) {
+                        this.frame = Math.floor((frames / 5) % images.bird.length);
+                        this.y = 190 + Math.sin(frames * DEGREE * 5) * 8;
+                        this.rotation = 0;
+                    } else {
+                        if (state.current !== state.over || this.y < base.y - this.h/2) {
+                            this.speed += this.gravity;
+                            this.y += this.speed;
+                        }
+
+                        if (this.y + this.h / 2 >= base.y) {
+                            this.y = base.y - this.h / 2;
+                            if (state.current === state.game) {
+                                state.current = state.over; playSound('hit'); flash.start(); gameOverSequence.start();
+                            }
+                        }
+
+                        if (state.current === state.over) {
+                            this.frame = 1;
+                            if (this.y < base.y - this.h/2) {
+                               this.rotation = Math.min(90 * DEGREE, this.rotation + 4 * DEGREE);
+                            }
+                        } else {
+                            this.frame = Math.floor((frames / 5) % images.bird.length);
+                            if (this.speed >= 0) {
+                                this.rotation = Math.min(90 * DEGREE, this.rotation + 4 * DEGREE);
+                            } else {
+                                this.rotation = -25 * DEGREE;
+                            }
+                        }
+                    }
+                },
+                reset: function() { this.speed = 0; this.y = 190; }
+            };
+
+            const pipes = {
+                position: [], w: 52, h: 320, gap: 100, maxYPos: -40, dx: 2,
+                draw: function() { for (let p of this.position) { ctx.drawImage(images.pipeTop, p.x, p.y); ctx.drawImage(images.pipeBottom, p.x, p.y + this.h + this.gap); }},
+                update: function() {
+                    if (state.current !== state.game) return;
+                    if (frames % 100 === 0) this.position.push({ x: canvas.width, y: this.maxYPos - (Math.random() * 200), passed: false });
+                    for (let i = this.position.length - 1; i >= 0; i--) {
+                        let p = this.position[i];
+                        p.x -= this.dx;
+                        let b = { left: bird.x - bird.w/2, right: bird.x + bird.w/2, top: bird.y - bird.h/2, bottom: bird.y + bird.h/2 };
+                        if (b.right > p.x && b.left < p.x + this.w && (b.top < p.y + this.h || b.bottom > p.y + this.h + this.gap)) {
+                            state.current = state.over; playSound('hit'); playSound('die'); flash.start(); gameOverSequence.start();
+                            bird.speed = 0;
+                        }
+                        if (p.x + this.w < bird.x && !p.passed) { score.value++; playSound('point'); p.passed = true; }
+                        if (p.x + this.w < 0) this.position.splice(i, 1);
+                    }
+                },
+                reset: function() { this.position = []; }
+            };
+            
+            const ui = {
+                titleSize: { w: 225, h: 45 }, panelSize: { w: 225, h: 112 },
+                buttonSize: { w: 100, h: 58 }, tapSymbolSize: { w: 80, h: 70 },
+                tapSymbolAlpha: 1.0, isFadingTapSymbol: false,
+                
+                get playRect() { return { x: (canvas.width - this.buttonSize.w) / 2, y: 280, ...this.buttonSize }; },
+                get replayRect() { return { x: (canvas.width - this.buttonSize.w) / 2, y: 310, ...this.buttonSize }; },
+
+                draw: function() {
+                    if (state.current === state.getReady) {
+                        this.drawPulsingButton(images.playButton, this.playRect, frames);
+                        ctx.drawImage(images.getReady, (canvas.width - this.titleSize.w) / 2, 100, this.titleSize.w, this.titleSize.h);
+                    } else if (state.current === state.instructions || this.isFadingTapSymbol) {
+                        this.drawTapAnimation();
+                    } else if (state.current === state.over) {
+                        gameOverSequence.draw();
+                    }
+                },
+                drawPulsingButton: function(image, rect, frameCount) {
+                    const pulse = Math.sin(frameCount * DEGREE * 5) * 0.05 + 1;
+                    ctx.save(); ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
+                    ctx.scale(pulse, pulse); ctx.drawImage(image, -rect.w / 2, -rect.h / 2, rect.w, rect.h); ctx.restore();
+                },
+                drawTapAnimation: function() {
+                    ctx.save(); ctx.globalAlpha = this.tapSymbolAlpha;
+                    let isTicked = Math.floor(frames / 20) % 2 === 0;
+                    let currentSymbol = isTicked ? images.tapTickSymbol : images.tapSymbol;
+                    let pulse = Math.sin(frames * DEGREE * 8) * 0.05 + 1;
+                    let w = this.tapSymbolSize.w * pulse, h = this.tapSymbolSize.h * pulse;
+                    ctx.drawImage(currentSymbol, (canvas.width - w) / 2, 250, w, h); ctx.restore();
+                },
+                update: function() {
+                    if (this.isFadingTapSymbol) {
+                        this.tapSymbolAlpha -= 0.05;
+                        if (this.tapSymbolAlpha <= 0) { this.isFadingTapSymbol = false; }
+                    }
+                },
+                reset: function() { this.tapSymbolAlpha = 1.0; this.isFadingTapSymbol = false; }
+            };
+
+            const gameOverSequence = {
+                step: 0, timer: 0, panelY: canvas.height, panelTargetY: 180, panelSpeed: 15,
+                start: function() { this.step = 1; this.timer = 0; },
+                update: function() {
+                    if (this.step === 0) return; this.timer++;
+                    if (this.step === 1 && this.timer > 30) { this.step = 2; }
+                    if (this.step === 2) {
+                        this.panelY = Math.max(this.panelTargetY, this.panelY - this.panelSpeed);
+                        if (this.panelY === this.panelTargetY) this.step = 3;
+                    }
+                    if (this.step === 3 && this.timer > 90) { this.step = 4; }
+                },
+                draw: function() {
+                    if (this.step >= 2) { ctx.drawImage(images.gameOver, (canvas.width - ui.titleSize.w) / 2, 120, ui.titleSize.w, ui.titleSize.h); }
+                    if (this.step >= 2) { ctx.drawImage(images.uiBackground, (canvas.width - ui.panelSize.w) / 2, this.panelY, ui.panelSize.w, ui.panelSize.h); }
+                    if (this.step === 4) { ui.drawPulsingButton(images.replayButton, ui.replayRect, frames); }
+                },
+                reset: function() { this.step = 0; this.timer = 0; this.panelY = canvas.height; }
+            };
+
+            const score = {
+                best: parseInt(localStorage.getItem('flappybird_best')) || 0, value: 0,
+                draw: function() {
+                    if (state.current === state.game) { drawTextWithShadow(this.value, canvas.width / 2, 50, "35px 'Arial Black', sans-serif", "center"); }
+                    else if (state.current === state.over && gameOverSequence.step >= 2) {
+                        drawTextWithShadow("Score", 80, gameOverSequence.panelY + 42, "20px 'Arial Black', sans-serif", "left");
+                        drawTextWithShadow("Best", 80, gameOverSequence.panelY + 82, "20px 'Arial Black', sans-serif", "left");
+                        drawTextWithShadow(this.value, 210, gameOverSequence.panelY + 42, "20px 'Arial Black', sans-serif", "right");
+                        drawTextWithShadow(this.best, 210, gameOverSequence.panelY + 82, "20px 'Arial Black', sans-serif", "right");
+                    }
+                },
+                reset: function() { if (this.value > this.best) { this.best = this.value; localStorage.setItem('flappybird_best', this.best); } this.value = 0; }
+            };
+            
+            function drawTextWithShadow(text, x, y, font, align){
+                ctx.font = font; ctx.textAlign = align;
+                ctx.fillStyle = "#000"; ctx.fillText(text, x + 2, y + 2);
+                ctx.fillStyle = "#FFF"; ctx.fillText(text, x, y);
             }
+
+            function getMousePos(canvasEl, evt) {
+                const rect = canvasEl.getBoundingClientRect();
+                const scaleX = canvasEl.width / rect.width;
+                const scaleY = canvasEl.height / rect.height;
+                const clientX = evt.clientX || (evt.touches && evt.touches[0].clientX);
+                const clientY = evt.clientY || (evt.touches && evt.touches[0].clientY);
+                return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+            }
+            function isInside(pos, rect) { return pos.x > rect.x && pos.x < rect.x + rect.w && pos.y < rect.y + rect.h && pos.y > rect.y; }
+
+            function handleInput() {
+                if (state.current === state.instructions || state.current === state.game) {
+                    if (state.current === state.instructions) {
+                        ui.isFadingTapSymbol = true;
+                        state.current = state.game;
+                    }
+                    bird.flap(); playSound('flap');
+                }
+            }
+            
+            function processClick(evt) {
+                if (transition.active) return;
+                const pos = getMousePos(canvas, evt);
+                if (state.current === state.getReady && isInside(pos, ui.playRect)) {
+                    transition.start(state.instructions);
+                } else if (state.current === state.over && gameOverSequence.step === 4 && isInside(pos, ui.replayRect)) {
+                    transition.start(state.getReady);
+                } else {
+                    handleInput();
+                }
+            }
+            
+            canvas.addEventListener('click', processClick);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); processClick(e); }, { passive: false });
+            
+            document.addEventListener('keydown', (e) => { if (e.code === 'Space') handleInput(); });
+            
+            function resetGame() { bird.reset(); pipes.reset(); score.reset(); ui.reset(); flash.reset(); gameOverSequence.reset(); }
+            function update() { bird.update(); pipes.update(); base.update(); ui.update(); transition.update(); flash.update(); gameOverSequence.update(); }
+            function draw() { bg.draw(); pipes.draw(); bird.draw(); base.draw(); ui.draw(); score.draw(); flash.draw(); transition.draw(); }
+
+            function loop() {
+                update(); draw(); frames++; requestAnimationFrame(loop);
+            }
+            loop();
         }
-    }
 
-    // Update
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-        let o = obstacles[i];
-        o.x -= speed;
-        if(o.type === "BIRD" && frames % 10 === 0) o.frame++;
-
-        if (checkColl(dino, o)) {
-            gameState = "DYING";
-            dino.state = "DEAD";
-            dino.frame = 0;
-            sounds.die.play().catch(()=>{});
-            ui.flashOp = 0.7;
-        }
-
-        if(o.x < -100) obstacles.splice(i, 1);
-    }
-}
-
-function checkColl(d, o) {
-    let dx = d.x + 20;
-    let dy = d.y + 15;
-    let dw = CONFIG.dinoSize - 40;
-    let dh = CONFIG.dinoSize - 25;
-
-    if (d.state === "DUCK") {
-        dh = 35; 
-        dy = d.y + 50; 
-    }
-
-    let ox = o.x + 8;
-    let oy = o.y + 8;
-    let ow = o.w - 16;
-    let oh = o.h - 16;
-
-    return (dx < ox + ow && dx + dw > ox && dy < oy + oh && dy + dh > oy);
-}
-
-function draw() {
-    ctx.clearRect(0,0, canvas.width, canvas.height);
-
-    if(assets.bg) ctx.drawImage(assets.bg, 0, 0, canvas.width, canvas.height);
-
-    if(assets.ground) {
-        let x = -groundOffset;
-        while(x < canvas.width) {
-            ctx.drawImage(assets.ground, x, canvas.height - CONFIG.groundH, assets.ground.width, CONFIG.groundH);
-            x += assets.ground.width;
-        }
-    }
-
-    obstacles.forEach(o => {
-        if(o.type === "CACTUS") ctx.drawImage(assets.cactus, o.x, o.y, o.w, o.h);
-        else {
-            let img = assets.bird[o.frame % assets.bird.length];
-            if(img) ctx.drawImage(img, o.x, o.y, o.w, o.h);
-        }
-    });
-
-    let sprite;
-    if(dino.state === "IDLE") sprite = assets.idle[Math.floor(frames/10) % assets.idle.length];
-    else if(dino.state === "DEAD") sprite = (gameState === "GAMEOVER") ? assets.dead[7] : assets.dead[dino.frame % 8];
-    else if(dino.state === "JUMP") sprite = assets.jump[Math.floor(frames/5) % 12];
-    else if(dino.state === "DUCK") sprite = assets.dead[6] || assets.run[0]; 
-    else sprite = assets.run[Math.floor(frames/4) % 8];
-
-    if(sprite) ctx.drawImage(sprite, dino.x, dino.y, CONFIG.dinoSize, CONFIG.dinoSize);
-
-    if(ui.flashOp > 0.01) {
-        ctx.fillStyle = `rgba(255,255,255,${ui.flashOp})`;
-        ctx.fillRect(0,0, canvas.width, canvas.height);
-    }
-
-    drawUI();
-}
-
-function drawUI() {
-    if (gameState === "HOME") {
-        ctx.fillStyle = "#fff";
-        ctx.strokeStyle = "#222";
-        ctx.lineWidth = 6;
-        ctx.textAlign = "center";
-        
-        ctx.font = "80px 'Fredoka One'";
-        ctx.strokeText("DINO RUN", canvas.width/2, 160);
-        ctx.fillText("DINO RUN", canvas.width/2, 160);
-
-        if (assets.btnPlay) {
-            // 150x150 Pulsing
-            const w = 150 * ui.pulse;
-            const h = 150 * ui.pulse;
-            ctx.drawImage(assets.btnPlay, canvas.width/2 - w/2, 260 - h/2, w, h);
-        }
-    }
-
-    if (gameState === "PLAY" || gameState === "DYING") {
-        ctx.fillStyle = "#fff";
-        ctx.strokeStyle = "#333";
-        ctx.lineWidth = 4;
-        ctx.font = "40px 'Fredoka One'";
-        ctx.textAlign = "center";
-        ctx.strokeText(Math.floor(score), canvas.width/2, 60);
-        ctx.fillText(Math.floor(score), canvas.width/2, 60);
-    }
-
-    if (gameState === "GAMEOVER") {
-        ctx.save();
-        ctx.translate(0, ui.textY);
-        ctx.font = "60px 'Fredoka One'";
-        ctx.fillStyle = "#ff6f00";
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 5;
-        ctx.textAlign = "center";
-        ctx.strokeText("GAME OVER", canvas.width/2, 0);
-        ctx.fillText("GAME OVER", canvas.width/2, 0);
-        ctx.restore();
-
-        ctx.save();
-        ctx.translate(0, ui.boardY);
-        const pW = 320, pH = 170;
-        const pX = canvas.width/2 - pW/2, pY = 0;
-
-        ctx.fillStyle = "#ffe0b2";
-        ctx.strokeStyle = "#5d4037";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.roundRect(pX, pY, pW, pH, 15);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = "#e65100";
-        ctx.font = "24px 'Fredoka One'";
-        ctx.textAlign = "right";
-        ctx.fillText("SCORE", pX+290, pY+45);
-        ctx.fillText("BEST", pX+290, pY+105);
-
-        ctx.fillStyle = "#333";
-        ctx.font = "35px 'Fredoka One'";
-        ctx.fillText(Math.floor(score), pX+290, pY+80);
-        ctx.fillText(Math.floor(highScore), pX+290, pY+140);
-        
-        ctx.beginPath();
-        ctx.arc(pX+70, pY+85, 40, 0, Math.PI*2);
-        ctx.fillStyle = score > 1000 ? "#ffca28" : "#cfd8dc"; 
-        ctx.fill();
-        ctx.strokeStyle = "#333";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.restore();
-
-        if(assets.btnReplay) {
-            // 150x150 Pulsing
-            const w = 150 * ui.pulse;
-            const h = 150 * ui.pulse;
-            ctx.drawImage(assets.btnReplay, canvas.width/2 - w/2, (ui.boardY + 190) - h/2, w, h);
-        }
-    }
-}
-
-function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
-}
-
-const checkClick = () => {
-    if (gameState === "HOME") startGame();
-    else if (gameState === "GAMEOVER") {
-         if (Math.abs(ui.boardY - ui.targetBoardY) < 5) goHome();
-    }
-};
-
-window.addEventListener('keydown', e => {
-    if(e.code === 'ArrowUp' || e.code === 'Space') input.up = true;
-    if(e.code === 'ArrowDown') input.down = true;
-    if(gameState !== "PLAY") checkClick();
-});
-window.addEventListener('keyup', e => {
-    if(e.code === 'ArrowDown') input.down = false;
-    if(e.code === 'ArrowUp') input.up = false;
-});
-
-canvas.addEventListener('mousedown', (e) => {
-    if(!isMobile) {
-        if (gameState === "PLAY") input.up = true;
-        else checkClick();
-    } else {
-        if (gameState === "GAMEOVER" || gameState === "HOME") checkClick();
-    }
-});
-canvas.addEventListener('mouseup', () => input.up = false);
-
-init();
-
-</script>
+        loadAssets();
+    </script>
 </body>
 </html>
